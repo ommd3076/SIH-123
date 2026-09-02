@@ -1,0 +1,75 @@
+{
+  "fleet": {
+    "robot_count": 10,
+    "tick_hz": 10,
+    "intent_hz": 2,
+    "heartbeat_hz": 1,
+    "mode": "FULL_DISTRIBUTED_PREDICTIVE",
+    "radio_range_robot": 18.0,
+    "radio_range_jec": 30.0,
+    "prediction_horizon_s": 5.0
+  },
+  "impairment": {
+    "latency_ms": 12.0,
+    "jitter_ms": 6.0,
+    "loss_pct": 0.5
+  },
+  "social_weights": {
+    "distance": 1.0,
+    "wait": 1.0,
+    "energy": 0.05,
+    "congestion": 0.6,
+    "externality": 0.8,
+    "risk": 0.4
+  },
+  "fairness": {
+    "aging_per_s": 0.15,
+    "yield_bonus": 0.8,
+    "denial_bonus": 0.5,
+    "max_effective_priority": 25.0,
+    "starvation_wait_s": 12.0
+  },
+  "battery": {
+    "move_drain_pct_s": 0.008,
+    "idle_drain_pct_s": 0.002,
+    "charge_rate_pct_s": 0.06,
+    "low_threshold": 25.0,
+    "critical_threshold": 12.0,
+    "start_pct": [
+      72,
+      96
+    ]
+  },
+  "safety": {
+    "min_separation_m": 0.9,
+    "slow_separation_m": 1.5,
+    "collision_horizon_s": 2.0,
+    "emergency_stop_gap_m": 0.75
+  },
+  "narrow_gate": {
+    "min_ownership_s": 6.0,
+    "release_quiet_s": 1.5,
+    "claim_listen_s": 0.5
+  },
+  "reservation": {
+    "lease_s": 4.0,
+    "junction_service_s": 1.6,
+    "request_lead_m": 3.0
+  },
+  "allocator": {
+    "bid_window_s": 0.6,
+    "auction_interval_s": 1.0,
+    "max_tasks_per_robot": 2
+  },
+  "predictor": {
+    "model": "mlp",
+    "horizon_s": 5.0,
+    "model_path": "models/congestion_mlp.json"
+  },
+  "transport": {
+    "backend": "zenoh",
+    "zenoh_port": 7447,
+    "udp_port": 50101,
+    "group": "239.255.42.99"
+  }
+}

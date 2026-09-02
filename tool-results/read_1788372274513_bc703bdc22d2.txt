@@ -1,0 +1,1663 @@
+     1→MASTER BUILD PROMPT — SIH26123
+     2→DISTRIBUTED PREDICTIVE FLEET GRAPH
+     3→FULL 10-AMR FUNCTIONAL MVP
+     4→
+     5→You are acting simultaneously as:
+     6→
+     7→- lead principal robotics engineer
+     8→- distributed-systems architect
+     9→- ROS 2 / Gazebo engineer
+    10→- multi-agent path-planning researcher
+    11→- edge-AI engineer
+    12→- simulation engineer
+    13→- full-stack product engineer
+    14→- senior interaction / motion designer
+    15→- ruthless integration and QA engineer
+    16→
+    17→Your job is NOT to write a proposal, architecture document, mock dashboard, pseudo-code demo, or non-functional proof of concept.
+    18→
+    19→YOUR JOB IS TO BUILD THE ACTUAL WORKING MVP END-TO-END.
+    20→
+    21→You have authority to:
+    22→- inspect the local environment
+    23→- install appropriate development skills/tools if the environment supports skills
+    24→- inspect available agent skills before coding
+    25→- use browser/web research where available
+    26→- clone and study open-source repositories
+    27→- install packages and dependencies
+    28→- create Docker / devcontainer setup
+    29→- create ROS 2 packages
+    30→- run builds
+    31→- run tests
+    32→- launch simulations
+    33→- inspect logs
+    34→- fix failures
+    35→- iterate until the system runs
+    36→- create documentation and demo scripts
+    37→
+    38→Do not stop after scaffolding.
+    39→
+    40→Do not return a plan and wait for approval unless an unavoidable destructive action or unavailable credential blocks progress.
+    41→
+    42→EXECUTE.
+    43→
+    44→==================================================
+    45→0. PRIMARY OBJECTIVE
+    46→==================================================
+    47→
+    48→Build a fully functioning software MVP for SIH26123:
+    49→
+    50→"Edge-AI Based Distributed Fleet Coordination for Autonomous Mobile Robots in Smart Warehouses."
+    51→
+    52→Prototype requirements for OUR system:
+    53→
+    54→- simulate 10 autonomous mobile robots
+    55→- simulate a warehouse with:
+    56→  - narrow aisles
+    57→  - wide aisles
+    58→  - open areas
+    59→  - four-way intersections
+    60→  - bottlenecks
+    61→  - pickup zones
+    62→  - drop zones
+    63→  - charging / idle zones
+    64→- distributed runtime architecture
+    65→- robot-to-robot trajectory intent sharing
+    66→- logical Junction Edge Cells
+    67→- contextual / spatiotemporal fleet graph
+    68→- future occupancy prediction
+    69→- capacity-aware routing
+    70→- conflict-cell formation
+    71→- space-time reservations
+    72→- prosocial fleet routing
+    73→- starvation prevention
+    74→- dynamic blockage propagation
+    75→- task reassignment
+    76→- congestion prediction
+    77→- infrastructure-node failure fallback
+    78→- network degradation simulation
+    79→- deterministic safety layer
+    80→- live visual dashboard
+    81→- baseline-vs-ours experimentation
+    82→- measurable analytics
+    83→
+    84→Minimum success condition:
+    85→
+    86→A new developer must be able to clone the repository and launch a convincing end-to-end demo using a small number of documented commands.
+    87→
+    88→==================================================
+    89→1. DO NOT BUILD GENERIC "AI FLEET MANAGEMENT"
+    90→==================================================
+    91→
+    92→The architectural thesis is:
+    93→
+    94→INFRASTRUCTURE-ASSISTED DISTRIBUTED PREDICTIVE FLEET GRAPH.
+    95→
+    96→Do not turn this into:
+    97→
+    98→central server
+    99→→ receives every robot pose
+   100→→ computes every path
+   101→→ sends commands.
+   102→
+   103→That fails the architectural goal.
+   104→
+   105→Instead:
+   106→
+   107→ROBOTS
+   108→+
+   109→LOCAL JUNCTION EDGE CELLS
+   110→+
+   111→DISTRIBUTED CONTEXT
+   112→+
+   113→LOCAL CONFLICT COORDINATION.
+   114→
+   115→No globally authoritative traffic controller should be required for runtime movement.
+   116→
+   117→The dashboard is observability/control for demonstrations, NOT a hidden centralized fleet brain.
+   118→
+   119→==================================================
+   120→2. CORE SYSTEM MODEL
+   121→==================================================
+   122→
+   123→Implement three primary runtime actor types.
+   124→
+   125→A. ROBOT EDGE AGENT
+   126→
+   127→Each simulated AMR owns:
+   128→
+   129→- robot ID
+   130→- pose
+   131→- velocity
+   132→- health
+   133→- current task
+   134→- battery state
+   135→- current route
+   136→- next junctions
+   137→- trajectory intent
+   138→- local context cache
+   139→- reservation state
+   140→- yield counter / fairness age
+   141→- communications state
+   142→
+   143→Each robot should independently run logic equivalent to:
+   144→
+   145→localization / simulated state
+   146→→ route generation
+   147→→ local intent
+   148→→ conflict awareness
+   149→→ reservation logic
+   150→→ deterministic safety check
+   151→→ movement execution.
+   152→
+   153→The robot must remain capable of basic operation if Junction Edge Cells fail.
+   154→
+   155→B. JUNCTION EDGE CELL — JEC
+   156→
+   157→Create logical JEC processes at strategically important junctions.
+   158→
+   159→A JEC knows ONLY its local area.
+   160→
+   161→It maintains:
+   162→
+   163→- connected aisles
+   164→- capacities
+   165→- current occupancy
+   166→- predicted occupancy
+   167→- approaching robots
+   168→- local queue
+   169→- reservations
+   170→- blockage state
+   171→- traffic direction
+   172→- congestion estimate
+   173→- relevant contextual memory
+   174→
+   175→A JEC does NOT:
+   176→
+   177→- issue motor commands
+   178→- own the global map
+   179→- compute global routes
+   180→- become mandatory for robot safety.
+   181→
+   182→JEC = local coordination accelerator.
+   183→
+   184→C. DISTRIBUTED SPATIOTEMPORAL CONTEXT GRAPH
+   185→
+   186→Represent warehouse entities as graph structures.
+   187→
+   188→Node types should include at least:
+   189→
+   190→- junction
+   191→- zone
+   192→- pickup area
+   193→- drop area
+   194→- charging area
+   195→- robot
+   196→- dynamic event
+   197→
+   198→Edge types should include at least:
+   199→
+   200→- physical connectivity
+   201→- intended traversal
+   202→- reservation
+   203→- blockage effect
+   204→- local conflict relationship
+   205→
+   206→Warehouse edge properties:
+   207→
+   208→- length
+   209→- width
+   210→- capacity
+   211→- allowed direction
+   212→- nominal speed
+   213→- current occupancy
+   214→- predicted occupancy
+   215→- queue size
+   216→- congestion score
+   217→- risk
+   218→- temporary blockage
+   219→- estimated traversal time
+   220→
+   221→Contextual events should contain:
+   222→
+   223→- event type
+   224→- value
+   225→- reporter
+   226→- timestamp
+   227→- confidence
+   228→- TTL
+   229→- affected graph entities
+   230→
+   231→==================================================
+   232→3. GRAPH OF FUTURES
+   233→==================================================
+   234→
+   235→The important concept is:
+   236→
+   237→Do not model only current position.
+   238→
+   239→Model a SHORT-HORIZON FUTURE.
+   240→
+   241→Each robot publishes an intent such as:
+   242→
+   243→robot_id
+   244→route_segment[]
+   245→position
+   246→velocity
+   247→ETA to next junction(s)
+   248→time-window occupancy
+   249→task urgency
+   250→confidence
+   251→timestamp.
+   252→
+   253→Example:
+   254→
+   255→R4:
+   256→A3 → J7 → C4
+   257→ETA(J7) = 3.2 sec
+   258→occupancy[J7] = 3.1–4.0 sec
+   259→
+   260→Use this to predict:
+   261→
+   262→- collisions
+   263→- intersection contention
+   264→- bottlenecks
+   265→- future congestion
+   266→- capacity violation.
+   267→
+   268→Implement a configurable prediction horizon, initially around several seconds.
+   269→
+   270→==================================================
+   271→4. CONFLICT CELLS
+   272→==================================================
+   273→
+   274→Do NOT make every robot coordinate continuously with all nine others.
+   275→
+   276→Construct a conflict graph.
+   277→
+   278→Robots become connected when their predicted spatiotemporal occupancy overlaps or they compete for the same scarce resource.
+   279→
+   280→When:
+   281→
+   282→R2
+   283→R5
+   284→R8
+   285→
+   286→all intend to use J7 within conflicting intervals, form:
+   287→
+   288→ConflictCell-J7-{R2,R5,R8}
+   289→
+   290→Only those robots and the relevant JEC participate in high-frequency negotiation.
+   291→
+   292→After the conflict clears:
+   293→
+   294→destroy / expire the conflict cell.
+   295→
+   296→Demonstrate that communication complexity follows local conflicts rather than total fleet size.
+   297→
+   298→==================================================
+   299→5. CAPACITY-AWARE AISLES
+   300→==================================================
+   301→
+   302→Implement warehouse transport capacity explicitly.
+   303→
+   304→Examples:
+   305→
+   306→NARROW AISLE
+   307→capacity = 1
+   308→opposing simultaneous entry prohibited.
+   309→
+   310→WIDE AISLE
+   311→capacity = 2.
+   312→
+   313→OPEN ZONE
+   314→capacity > 2
+   315→with logical lane / flow behavior.
+   316→
+   317→Do NOT assume every map edge is simply free or occupied.
+   318→
+   319→Create capacity-aware path traversal.
+   320→
+   321→For narrow aisles:
+   322→
+   323→support temporary direction ownership.
+   324→
+   325→Example:
+   326→
+   327→northbound batch:
+   328→R2
+   329→R4
+   330→R7
+   331→
+   332→then release direction and permit southbound flow.
+   333→
+   334→Avoid oscillating direction every second.
+   335→
+   336→Implement hysteresis / minimum ownership windows.
+   337→
+   338→==================================================
+   339→6. VIRTUAL TRAFFIC GEOMETRY
+   340→==================================================
+   341→
+   342→In large open areas:
+   343→
+   344→support configurable virtual directional lanes.
+   345→
+   346→Start simple:
+   347→
+   348→- directional preferred corridors
+   349→- merge lanes
+   350→- optional express / deadline lane experiment
+   351→
+   352→Do not spend excessive engineering effort on dynamically creating arbitrary 5-lane geometries unless the base system works.
+   353→
+   354→The MVP priority is:
+   355→
+   356→capacity
+   357→directionality
+   358→reservations
+   359→congestion.
+   360→
+   361→==================================================
+   362→7. SPACE-TIME RESERVATIONS
+   363→==================================================
+   364→
+   365→Implement future reservation slots.
+   366→
+   367→Resource examples:
+   368→
+   369→junction J7
+   370→aisle A4
+   371→
+   372→Reservation:
+   373→
+   374→resource_id
+   375→robot_id
+   376→start_time
+   377→end_time
+   378→priority
+   379→state
+   380→lease_expiry.
+   381→
+   382→States:
+   383→
+   384→REQUESTED
+   385→GRANTED
+   386→ACTIVE
+   387→RELEASED
+   388→EXPIRED
+   389→REJECTED.
+   390→
+   391→Prevent permanent stale reservations using leases/timeouts.
+   392→
+   393→Conflict resolution MUST be deterministic for identical inputs.
+   394→
+   395→==================================================
+   396→8. PROSOCIAL ROUTING
+   397→==================================================
+   398→
+   399→Do not optimize every robot independently for shortest distance.
+   400→
+   401→Create a social-cost function.
+   402→
+   403→Initial model:
+   404→
+   405→route_cost =
+   406→w_distance * own_travel_time
+   407→+
+   408→w_wait * expected_wait
+   409→+
+   410→w_energy * estimated_energy
+   411→+
+   412→w_congestion * congestion_cost
+   413→+
+   414→w_externality * estimated_delay_imposed_on_local_fleet
+   415→+
+   416→w_risk * safety/risk_cost.
+   417→
+   418→The important term is:
+   419→
+   420→EXTERNALITY.
+   421→
+   422→Example:
+   423→
+   424→R1 saves 3 seconds by entering A4,
+   425→but causes three other robots a combined 16-second delay.
+   426→
+   427→The planner should be capable of selecting the slightly longer route.
+   428→
+   429→Limit externality calculation to the robot's local prediction horizon / conflict neighborhood so computation remains tractable.
+   430→
+   431→Make weights configurable from the dashboard/config file.
+   432→
+   433→==================================================
+   434→9. FAIRNESS / STARVATION PREVENTION
+   435→==================================================
+   436→
+   437→Track:
+   438→
+   439→waiting duration
+   440→number of yields
+   441→deadline urgency
+   442→reservation denials.
+   443→
+   444→Use priority aging.
+   445→
+   446→A robot that repeatedly yields receives progressively more effective priority.
+   447→
+   448→Create a metric that detects starvation.
+   449→
+   450→A low-priority robot must eventually make progress.
+   451→
+   452→==================================================
+   453→10. EDGE AI
+   454→==================================================
+   455→
+   456→AI MUST NOT directly command wheel velocities.
+   457→
+   458→AI belongs only in prediction / optimization support.
+   459→
+   460→Implement at least ONE actually working lightweight predictive component.
+   461→
+   462→Preferred first component:
+   463→
+   464→LOCAL CONGESTION PREDICTOR.
+   465→
+   466→Inputs may include:
+   467→
+   468→- current occupancy
+   469→- approaching robot count
+   470→- queue length
+   471→- trajectory-intent count
+   472→- downstream occupancy
+   473→- task demand
+   474→- hour/simulated schedule
+   475→- recent blockage events.
+   476→
+   477→Outputs:
+   478→
+   479→- predicted occupancy
+   480→or
+   481→- congestion probability
+   482→for short future horizons.
+   483→
+   484→Start with:
+   485→- heuristic baseline
+   486→
+   487→Then implement one lightweight learned model.
+   488→
+   489→Evaluate:
+   490→- XGBoost / LightGBM if convenient
+   491→- small MLP
+   492→- compact PyTorch model
+   493→- small GNN only if graph structure genuinely improves results.
+   494→
+   495→DO NOT use a GNN just to claim "graph AI."
+   496→
+   497→Generate simulation training data if real data is unavailable.
+   498→
+   499→Store the generated dataset and training/evaluation pipeline.
+   500→
+   501→Compare learned predictor against a simple baseline.
+   502→
+   503→If ML fails to outperform the heuristic:
+   504→keep the deterministic heuristic as default and retain ML as an experimental option.
+   505→
+   506→Accuracy must not be fabricated.
+   507→
+   508→==================================================
+   509→11. SAFETY LAYER
+   510→==================================================
+   511→
+   512→Safety is deterministic.
+   513→
+   514→Before movement execution, validate:
+   515→
+   516→- minimum robot separation
+   517→- next-cell occupancy
+   518→- reservation ownership
+   519→- aisle capacity
+   520→- direction ownership
+   521→- collision prediction
+   522→- emergency stop threshold.
+   523→
+   524→The system should preserve:
+   525→
+   526→AI predicts.
+   527→Algorithms coordinate.
+   528→Safety logic vetoes.
+   529→
+   530→Expose safety veto events in telemetry.
+   531→
+   532→Create at least one demo where a bad route / reservation proposal is rejected.
+   533→
+   534→==================================================
+   535→12. DISTRIBUTED CONTEXTUAL MEMORY
+   536→==================================================
+   537→
+   538→Implement events such as:
+   539→
+   540→AISLE_BLOCKED
+   541→AISLE_CLEARED
+   542→HUMAN_ACTIVITY
+   543→ROBOT_FAILED
+   544→BATTERY_CRITICAL
+   545→CONGESTION_SPIKE
+   546→JEC_OFFLINE.
+   547→
+   548→Example:
+   549→
+   550→AISLE_BLOCKED:
+   551→resource = A8
+   552→reporter = R4
+   553→confidence = 0.96
+   554→TTL = 20s
+   555→
+   556→Relevant nearby actors should receive the event.
+   557→
+   558→Expired context should disappear unless refreshed.
+   559→
+   560→Do not create an infinitely growing event log in every agent.
+   561→
+   562→==================================================
+   563→13. COMMUNICATION ARCHITECTURE
+   564→==================================================
+   565→
+   566→Evaluate Zenoh seriously.
+   567→
+   568→Research and use official/current ROS 2 / Zenoh documentation.
+   569→
+   570→Candidate options:
+   571→
+   572→1. rmw_zenoh
+   573→2. native Zenoh for coordination messages while ROS 2 remains internal
+   574→3. DDS locally + Zenoh bridge where justified.
+   575→
+   576→IMPORTANT:
+   577→
+   578→Do not falsely claim that current rmw_zenoh automatically provides a completely routerless decentralized system in every configuration.
+   579→
+   580→Audit current behavior.
+   581→
+   582→Prefer this conceptual architecture if technically cleaner:
+   583→
+   584→Robot internal ROS 2 / Nav2
+   585→        ↓
+   586→Coordination Agent
+   587→        ↓
+   588→Zenoh coordination plane
+   589→        ↓
+   590→nearby robots / JECs.
+   591→
+   592→Implement topic/key namespaces cleanly.
+   593→
+   594→Example:
+   595→
+   596→fleet/robot/R3/heartbeat
+   597→fleet/robot/R3/intent
+   598→fleet/jec/J7/state
+   599→fleet/jec/J7/reservations
+   600→fleet/events/blockage
+   601→fleet/conflict/{cell_id}
+   602→
+   603→Use:
+   604→- lightweight heartbeat messages
+   605→- event-triggered richer messages.
+   606→
+   607→Avoid all-to-all high-frequency broadcast.
+   608→
+   609→==================================================
+   610→14. OPEN-SOURCE REPOSITORIES TO AUDIT
+   611→==================================================
+   612→
+   613→DO NOT blindly rewrite mature components.
+   614→
+   615→Research and inspect current versions/licensing of relevant repos.
+   616→
+   617→At minimum evaluate:
+   618→
+   619→A.
+   620→https://github.com/Adilnasceng/multi-robot-warehouse
+   621→
+   622→Why:
+   623→existing ROS2 multi-robot warehouse baseline with:
+   624→- Gazebo
+   625→- Nav2
+   626→- conflict handling
+   627→- task allocation
+   628→- dashboard.
+   629→
+   630→Use as:
+   631→- architecture reference
+   632→- simulation bootstrap
+   633→- optional fork/base IF compatible.
+   634→
+   635→Do NOT simply relabel its centralized fleet manager as our solution.
+   636→
+   637→Replace / isolate centralized coordination where necessary.
+   638→
+   639→B.
+   640→https://github.com/ros2/rmw_zenoh
+   641→
+   642→Use official branch matching selected ROS distro.
+   643→
+   644→C.
+   645→https://github.com/eclipse-zenoh/zenoh
+   646→
+   647→Use native Zenoh if appropriate.
+   648→
+   649→D.
+   650→Official Nav2 repository/documentation.
+   651→
+   652→E.
+   653→Official Gazebo examples/documentation.
+   654→
+   655→F.
+   656→Open-RMF:
+   657→study relevant traffic / schedule concepts,
+   658→but DO NOT import a central scheduler in a way that defeats our decentralized architecture.
+   659→
+   660→Before adopting a repository:
+   661→
+   662→- inspect license
+   663→- inspect active maintenance
+   664→- inspect ROS version compatibility
+   665→- record commit SHA
+   666→- document what code is reused
+   667→- preserve license notices.
+   668→
+   669→Create:
+   670→
+   671→docs/OPEN_SOURCE.md
+   672→
+   673→with:
+   674→- repo
+   675→- license
+   676→- commit used
+   677→- purpose
+   678→- modifications.
+   679→
+   680→==================================================
+   681→15. ROS / SIMULATION STACK
+   682→==================================================
+   683→
+   684→Prefer a current supported ROS 2 stack.
+   685→
+   686→Audit compatibility before choosing.
+   687→
+   688→Desired direction:
+   689→
+   690→ROS 2 Jazzy
+   691→+
+   692→Gazebo Harmonic
+   693→+
+   694→Nav2
+   695→
+   696→IF a critical open-source base only runs reliably on Humble/Gazebo Classic, decide explicitly between:
+   697→
+   698→A. porting it
+   699→or
+   700→B. starting a clean Jazzy/Harmonic project while borrowing concepts.
+   701→
+   702→Do not create a broken hybrid.
+   703→
+   704→The primary objective is a reproducible working system.
+   705→
+   706→==================================================
+   707→16. 10-ROBOT WAREHOUSE WORLD
+   708→==================================================
+   709→
+   710→Create a visually convincing warehouse world.
+   711→
+   712→Minimum:
+   713→
+   714→10 robots:
+   715→R01–R10.
+   716→
+   717→Warehouse must have:
+   718→
+   719→- receiving dock
+   720→- storage racks
+   721→- narrow aisles
+   722→- cross aisles
+   723→- central junction
+   724→- at least one alternate route around a bottleneck
+   725→- packing/drop zone
+   726→- open staging area
+   727→- charging area.
+   728→
+   729→Create multiple traffic patterns.
+   730→
+   731→TASK TYPES:
+   732→
+   733→pickup → drop
+   734→reposition
+   735→charge
+   736→urgent task.
+   737→
+   738→Seeded scenario generation is preferred so benchmarks are reproducible.
+   739→
+   740→==================================================
+   741→17. TASK ALLOCATION
+   742→==================================================
+   743→
+   744→Do not make task allocation the primary research novelty.
+   745→
+   746→Build a pragmatic functional system.
+   747→
+   748→Possible baseline:
+   749→Hungarian allocation / simple auction.
+   750→
+   751→Then support distributed/localized reassignment.
+   752→
+   753→When robot R4 fails:
+   754→
+   755→its unfinished task returns to task pool.
+   756→
+   757→Relevant available robots bid using:
+   758→
+   759→ETA
+   760→battery
+   761→route congestion
+   762→task deadline
+   763→current load.
+   764→
+   765→Winner obtains task.
+   766→
+   767→Keep deterministic tie-breaking.
+   768→
+   769→==================================================
+   770→18. SCHEDULE / DEMAND CONTEXT
+   771→==================================================
+   772→
+   773→Implement a small simulated warehouse operations schedule.
+   774→
+   775→Example JSON:
+   776→
+   777→09:00:
+   778→inbound spike Zone A
+   779→
+   780→11:00:
+   781→outbound demand Zone B
+   782→
+   783→14:00:
+   784→normal load.
+   785→
+   786→This acts as prior context for congestion forecasting.
+   787→
+   788→It must NOT directly dictate routes.
+   789→
+   790→Create scenario controls so the user can inject:
+   791→
+   792→"outbound surge Zone B."
+   793→
+   794→==================================================
+   795→19. FAILURE + CHAOS TESTING
+   796→==================================================
+   797→
+   798→This is mandatory.
+   799→
+   800→Provide controls/scripts for:
+   801→
+   802→- block aisle
+   803→- unblock aisle
+   804→- fail robot
+   805→- recover robot
+   806→- kill JEC
+   807→- restart JEC
+   808→- add packet latency
+   809→- add packet loss
+   810→- burst tasks into zone
+   811→- trigger battery-critical robot.
+   812→
+   813→On Linux/container networking, investigate:
+   814→
+   815→tc netem
+   816→
+   817→for latency/loss.
+   818→
+   819→Do not pretend network degradation exists if it's merely a UI animation.
+   820→
+   821→==================================================
+   822→20. EXPERIMENT MODES
+   823→==================================================
+   824→
+   825→Implement selectable coordination modes.
+   826→
+   827→MODE A:
+   828→STOP_AND_WAIT
+   829→
+   830→MODE B:
+   831→SHORTEST_PATH_REACTIVE
+   832→
+   833→MODE C:
+   834→INTENT_P2P
+   835→
+   836→MODE D:
+   837→FULL_DISTRIBUTED_PREDICTIVE
+   838→
+   839→This allows apples-to-apples experiments.
+   840→
+   841→Configuration must use identical task seeds where possible.
+   842→
+   843→==================================================
+   844→21. METRICS
+   845→==================================================
+   846→
+   847→Collect actual measurements.
+   848→
+   849→At minimum:
+   850→
+   851→- task completion time
+   852→- tasks/hour
+   853→- average robot waiting time
+   854→- p95 waiting time
+   855→- total travel distance
+   856→- deadlocks
+   857→- collisions
+   858→- safety veto count
+   859→- route replans
+   860→- queue lengths
+   861→- reservation conflicts
+   862→- messages/sec
+   863→- bytes/sec
+   864→- per-agent CPU
+   865→- memory
+   866→- JEC utilization
+   867→- node recovery time
+   868→- estimated energy proxy
+   869→- fairness / max wait time.
+   870→
+   871→Store experiment output in:
+   872→
+   873→results/
+   874→
+   875→CSV and/or JSON.
+   876→
+   877→Create scripts to run repeated trials.
+   878→
+   879→Do not hard-code impressive fake numbers.
+   880→
+   881→==================================================
+   882→22. FRONTEND / PRODUCT EXPERIENCE
+   883→==================================================
+   884→
+   885→The frontend is NOT a generic admin dashboard.
+   886→
+   887→Design reference sites:
+   888→
+   889→https://www.supaste.com/#faq
+   890→https://fourmula.ai/?ref=navbar.gallery
+   891→
+   892→Study them directly in browser if tooling permits.
+   893→
+   894→IMPORTANT:
+   895→These are aesthetic/motion references only.
+   896→
+   897→DO NOT:
+   898→- copy branding
+   899→- copy exact sections
+   900→- copy text
+   901→- copy assets
+   902→- copy logos
+   903→- clone layouts 1:1.
+   904→
+   905→Extract design principles:
+   906→
+   907→FROM SUPASTE:
+   908→- premium restrained product presentation
+   909→- strong typography
+   910→- generous whitespace
+   911→- large visual product surfaces
+   912→- subtle depth
+   913→- clean hierarchy
+   914→- polished feature cards
+   915→- high-quality micro-interactions.
+   916→
+   917→FROM FOURMULA:
+   918→- editorial composition
+   919→- large typography
+   920→- motion-led storytelling
+   921→- strong visual transitions
+   922→- controlled asymmetry
+   923→- immersive product presentation.
+   924→
+   925→Our product aesthetic should feel:
+   926→
+   927→- advanced robotics research lab
+   928→- industrial autonomy
+   929→- premium
+   930→- technical
+   931→- minimal
+   932→- not "cyberpunk"
+   933→- not neon hacker UI
+   934→- not generic SaaS
+   935→- not fake AI dashboard.
+   936→
+   937→==================================================
+   938→23. DESIGN SKILLS
+   939→==================================================
+   940→
+   941→Before designing:
+   942→
+   943→1. inspect available agent skills
+   944→2. find relevant:
+   945→   - frontend design
+   946→   - UI/UX
+   947→   - motion
+   948→   - React
+   949→   - visualization
+   950→   - accessibility
+   951→   - web testing
+   952→3. install/use appropriate trusted skills if the coding environment supports installable skills.
+   953→4. read their instructions before implementation.
+   954→
+   955→Do not merely say:
+   956→"I used good design principles."
+   957→
+   958→Actually use the available workflow/tooling.
+   959→
+   960→==================================================
+   961→24. FRONTEND STACK
+   962→==================================================
+   963→
+   964→Preferred:
+   965→
+   966→Next.js
+   967→TypeScript
+   968→React
+   969→Tailwind CSS
+   970→
+   971→Motion:
+   972→Framer Motion and/or GSAP where appropriate.
+   973→
+   974→Visualization:
+   975→SVG / Canvas / WebGL selectively.
+   976→
+   977→For the live warehouse view:
+   978→consider:
+   979→- React Konva
+   980→- PixiJS
+   981→- SVG
+   982→- custom Canvas
+   983→
+   984→Choose based on performance and simplicity.
+   985→
+   986→Do NOT use a heavyweight 3D web renderer unless it meaningfully helps.
+   987→
+   988→Gazebo provides the physical 3D simulation.
+   989→
+   990→The browser should focus on:
+   991→- observability
+   992→- graph state
+   993→- trajectories
+   994→- decisions
+   995→- analytics.
+   996→
+   997→==================================================
+   998→25. CORE UI
+   999→==================================================
+  1000→
+  1001→Create one cohesive application with at least:
+  1002→
+  1003→A. LIVE FLEET VIEW
+  1004→
+  1005→Warehouse topology.
+  1006→
+  1007→Show:
+  1008→- 10 robots moving live
+  1009→- robot identity
+  1010→- trajectory intent
+  1011→- current route
+  1012→- junctions
+  1013→- aisle direction
+  1014→- occupancy
+  1015→- reservation windows
+  1016→- conflicts
+  1017→- blocked regions
+  1018→- JECs.
+  1019→
+  1020→B. GRAPH OF FUTURES MODE
+  1021→
+  1022→Toggle visualization that shows:
+  1023→
+  1024→- predicted trajectory paths
+  1025→- predicted future occupancy
+  1026→- congestion heat
+  1027→- conflict graph edges
+  1028→- upcoming reservations.
+  1029→
+  1030→Have time horizon controls:
+  1031→
+  1032→NOW
+  1033→+2s
+  1034→+5s
+  1035→+10s.
+  1036→
+  1037→C. ROBOT INSPECTOR
+  1038→
+  1039→Click R4 and show:
+  1040→
+  1041→- current task
+  1042→- battery
+  1043→- speed
+  1044→- ETA
+  1045→- chosen route
+  1046→- alternate routes
+  1047→- social cost
+  1048→- own cost
+  1049→- externality cost
+  1050→- current intent
+  1051→- reservations
+  1052→- messages
+  1053→- fairness/yield state.
+  1054→
+  1055→D. JEC INSPECTOR
+  1056→
+  1057→Click J7:
+  1058→
+  1059→- local capacity
+  1060→- current occupancy
+  1061→- future occupancy
+  1062→- queue
+  1063→- reservations
+  1064→- predicted congestion
+  1065→- JEC health
+  1066→- messages
+  1067→- connected aisles.
+  1068→
+  1069→E. DECISION EXPLAINER
+  1070→
+  1071→Show a live decision event:
+  1072→
+  1073→"R7 chose route B."
+  1074→
+  1075→WHY:
+  1076→
+  1077→Route A:
+  1078→own cost 4.1
+  1079→fleet externality 11.2
+  1080→total 15.3
+  1081→
+  1082→Route B:
+  1083→own cost 5.9
+  1084→fleet externality 2.1
+  1085→total 8.0
+  1086→
+  1087→This is extremely important.
+  1088→
+  1089→Judges must SEE why the system is different.
+  1090→
+  1091→F. FAILURE LAB
+  1092→
+  1093→Controls:
+  1094→
+  1095→BLOCK AISLE
+  1096→FAIL ROBOT
+  1097→FAIL JEC
+  1098→INJECT TASK BURST
+  1099→ADD LATENCY
+  1100→ADD PACKET LOSS.
+  1101→
+  1102→G. BENCHMARK LAB
+  1103→
+  1104→Select:
+  1105→
+  1106→stop-and-wait
+  1107→reactive
+  1108→intent-only
+  1109→full system.
+  1110→
+  1111→Run scenario.
+  1112→
+  1113→Show result charts.
+  1114→
+  1115→==================================================
+  1116→26. LANDING / STORY MODE
+  1117→==================================================
+  1118→
+  1119→Create a polished entry page before the dashboard.
+  1120→
+  1121→It should communicate the idea in <30 seconds.
+  1122→
+  1123→Suggested progression:
+  1124→
+  1125→HERO
+  1126→
+  1127→"Warehouse intelligence without a central brain."
+  1128→
+  1129→Supporting copy:
+  1130→
+  1131→A distributed predictive coordination fabric for autonomous warehouse robots.
+  1132→
+  1133→Then an animated topology visualization.
+  1134→
+  1135→Then:
+  1136→
+  1137→01
+  1138→SEE THE FUTURE
+  1139→Trajectory intent + future occupancy.
+  1140→
+  1141→02
+  1142→COORDINATE LOCALLY
+  1143→Conflict cells + Junction Edge Cells.
+  1144→
+  1145→03
+  1146→ROUTE PROSOCIALLY
+  1147→Optimize fleet throughput, not selfish shortest paths.
+  1148→
+  1149→04
+  1150→FAIL GRACEFULLY
+  1151→Kill infrastructure and robots continue.
+  1152→
+  1153→Then button:
+  1154→
+  1155→LAUNCH LIVE SIMULATION.
+  1156→
+  1157→Use Supaste/Fourmula-level polish, not their content.
+  1158→
+  1159→==================================================
+  1160→27. TYPOGRAPHY + MOTION
+  1161→==================================================
+  1162→
+  1163→Typography:
+  1164→
+  1165→Use a premium grotesk/sans-serif family available legally/open-source.
+  1166→
+  1167→Possible:
+  1168→- Geist
+  1169→- Inter
+  1170→- Instrument Sans
+  1171→- Manrope
+  1172→
+  1173→Choose based on actual design.
+  1174→
+  1175→Avoid using five families.
+  1176→
+  1177→Motion:
+  1178→
+  1179→- smooth section reveals
+  1180→- route line drawing
+  1181→- animated traffic flow
+  1182→- subtle number transitions
+  1183→- timeline scrub
+  1184→- reservation pulses
+  1185→- conflict-cell formation
+  1186→- layout morphs.
+  1187→
+  1188→Do not use meaningless floating gradients everywhere.
+  1189→
+  1190→Every animation should communicate system state or hierarchy.
+  1191→
+  1192→Respect prefers-reduced-motion.
+  1193→
+  1194→==================================================
+  1195→28. VISUAL SYSTEM
+  1196→==================================================
+  1197→
+  1198→Avoid:
+  1199→generic purple AI gradients
+  1200→blue neon cyberpunk
+  1201→fake command-line blocks everywhere.
+  1202→
+  1203→Preferred base:
+  1204→
+  1205→warm/off-white or near-black research interface
+  1206→+
+  1207→one restrained fleet accent
+  1208→+
+  1209→semantic state colors.
+  1210→
+  1211→Semantic colors may represent:
+  1212→healthy
+  1213→warning
+  1214→blocked
+  1215→conflict
+  1216→reservation
+  1217→prediction.
+  1218→
+  1219→Maintain strong WCAG contrast.
+  1220→
+  1221→==================================================
+  1222→29. FRONTEND ↔ SIMULATION CONNECTION
+  1223→==================================================
+  1224→
+  1225→The dashboard must consume REAL simulation state.
+  1226→
+  1227→Do not fake robot motion in the browser separately.
+  1228→
+  1229→Create a bridge/API.
+  1230→
+  1231→Possible:
+  1232→
+  1233→ROS/Zenoh
+  1234→→ telemetry service
+  1235→→ WebSocket
+  1236→→ frontend.
+  1237→
+  1238→Expose typed events.
+  1239→
+  1240→Example:
+  1241→
+  1242→robot_state
+  1243→robot_intent
+  1244→jec_state
+  1245→reservation
+  1246→context_event
+  1247→decision
+  1248→metric_sample
+  1249→conflict_cell
+  1250→safety_veto.
+  1251→
+  1252→Use real-time streaming.
+  1253→
+  1254→==================================================
+  1255→30. PROJECT ARCHITECTURE
+  1256→==================================================
+  1257→
+  1258→Aim for a monorepo approximately like:
+  1259→
+  1260→/
+  1261→├── robotics_ws/
+  1262→│   └── src/
+  1263→│       ├── warehouse_description/
+  1264→│       ├── warehouse_sim/
+  1265→│       ├── robot_agent/
+  1266→│       ├── junction_edge_cell/
+  1267→│       ├── fleet_graph/
+  1268→│       ├── coordination_msgs/
+  1269→│       ├── reservation_protocol/
+  1270→│       ├── task_allocation/
+  1271→│       ├── safety_layer/
+  1272→│       ├── congestion_predictor/
+  1273→│       ├── experiment_runner/
+  1274→│       └── telemetry_bridge/
+  1275→│
+  1276→├── web/
+  1277→│   ├── app/
+  1278→│   ├── components/
+  1279→│   ├── features/
+  1280→│   └── ...
+  1281→│
+  1282→├── configs/
+  1283→├── scenarios/
+  1284→├── models/
+  1285→├── datasets/
+  1286→├── results/
+  1287→├── scripts/
+  1288→├── docker/
+  1289→├── docs/
+  1290→├── docker-compose.yml
+  1291→└── README.md
+  1292→
+  1293→Change this structure when technically justified.
+  1294→
+  1295→==================================================
+  1296→31. IMPLEMENTATION PHASES
+  1297→==================================================
+  1298→
+  1299→DO NOT try to implement every advanced feature simultaneously.
+  1300→
+  1301→Work in vertical slices.
+  1302→
+  1303→PHASE 1
+  1304→Environment + dependencies + world + one robot.
+  1305→
+  1306→Verify movement.
+  1307→
+  1308→PHASE 2
+  1309→10 robot namespaces + Nav2.
+  1310→
+  1311→Verify all 10 can operate.
+  1312→
+  1313→PHASE 3
+  1314→Tasks + baseline shortest paths.
+  1315→
+  1316→PHASE 4
+  1317→Junction/aisle graph and capacities.
+  1318→
+  1319→PHASE 5
+  1320→Intent protocol.
+  1321→
+  1322→PHASE 6
+  1323→Conflict cells + reservations.
+  1324→
+  1325→PHASE 7
+  1326→Prosocial routing + fairness.
+  1327→
+  1328→PHASE 8
+  1329→JEC processes + fallback.
+  1330→
+  1331→PHASE 9
+  1332→Context events + dynamic blockage.
+  1333→
+  1334→PHASE 10
+  1335→Prediction model.
+  1336→
+  1337→PHASE 11
+  1338→Telemetry service.
+  1339→
+  1340→PHASE 12
+  1341→Premium frontend.
+  1342→
+  1343→PHASE 13
+  1344→Chaos/failure tooling.
+  1345→
+  1346→PHASE 14
+  1347→Benchmark system.
+  1348→
+  1349→PHASE 15
+  1350→QA + documentation + demo flow.
+  1351→
+  1352→After EVERY phase:
+  1353→
+  1354→BUILD
+  1355→RUN
+  1356→TEST
+  1357→FIX.
+  1358→
+  1359→==================================================
+  1360→32. TESTING
+  1361→==================================================
+  1362→
+  1363→Write unit tests for:
+  1364→
+  1365→- graph capacity logic
+  1366→- conflict detection
+  1367→- reservation overlap
+  1368→- priority aging
+  1369→- context expiry
+  1370→- social-cost calculation
+  1371→- deterministic tie-breaking.
+  1372→
+  1373→Integration tests:
+  1374→
+  1375→- two robots opposite narrow aisle
+  1376→- three-way junction
+  1377→- JEC loss
+  1378→- blocked aisle propagation
+  1379→- robot failure / task reassignment.
+  1380→
+  1381→End-to-end:
+  1382→
+  1383→launch full stack
+  1384→run scenario
+  1385→verify 10 robot telemetry streams
+  1386→verify tasks complete
+  1387→verify dashboard updates.
+  1388→
+  1389→==================================================
+  1390→33. REQUIRED DEMO SCENARIOS
+  1391→==================================================
+  1392→
+  1393→SCENARIO 1:
+  1394→NARROW AISLE.
+  1395→
+  1396→Two opposing flows.
+  1397→
+  1398→Demonstrate:
+  1399→capacity control
+  1400→direction ownership
+  1401→reservation.
+  1402→
+  1403→SCENARIO 2:
+  1404→JUNCTION CONFLICT.
+  1405→
+  1406→4 robots converge.
+  1407→
+  1408→Demonstrate:
+  1409→conflict cell
+  1410→priority
+  1411→fairness.
+  1412→
+  1413→SCENARIO 3:
+  1414→BLOCKAGE.
+  1415→
+  1416→Inject obstacle.
+  1417→
+  1418→Demonstrate:
+  1419→context event
+  1420→graph update
+  1421→reroute.
+  1422→
+  1423→SCENARIO 4:
+  1424→DEMAND SURGE.
+  1425→
+  1426→Zone B receives many tasks.
+  1427→
+  1428→Demonstrate:
+  1429→predicted congestion
+  1430→prosocial rerouting.
+  1431→
+  1432→SCENARIO 5:
+  1433→JEC FAILURE.
+  1434→
+  1435→Kill JEC.
+  1436→
+  1437→Demonstrate:
+  1438→fallback P2P coordination.
+  1439→
+  1440→SCENARIO 6:
+  1441→ROBOT FAILURE.
+  1442→
+  1443→Kill robot mid-task.
+  1444→
+  1445→Demonstrate:
+  1446→task reassignment.
+  1447→
+  1448→SCENARIO 7:
+  1449→NETWORK IMPAIRMENT.
+  1450→
+  1451→Add latency/loss.
+  1452→
+  1453→Demonstrate:
+  1454→continued safe operation
+  1455→and measurable degradation.
+  1456→
+  1457→==================================================
+  1458→34. RESEARCH HONESTY
+  1459→==================================================
+  1460→
+  1461→Do not make unsupported claims such as:
+  1462→
+  1463→"our system is novel"
+  1464→"first-ever"
+  1465→"patentable"
+  1466→"guaranteed 40% improvement."
+  1467→
+  1468→Benchmark it.
+  1469→
+  1470→The MVP should produce evidence.
+  1471→
+  1472→Create:
+  1473→
+  1474→docs/RESEARCH_NOTES.md
+  1475→
+  1476→Document:
+  1477→- hypotheses
+  1478→- assumptions
+  1479→- algorithms
+  1480→- baseline comparisons
+  1481→- limitations
+  1482→- future research.
+  1483→
+  1484→==================================================
+  1485→35. DOCUMENTATION
+  1486→==================================================
+  1487→
+  1488→Create:
+  1489→
+  1490→README.md
+  1491→
+  1492→Must include:
+  1493→
+  1494→- what this system is
+  1495→- architecture diagram
+  1496→- prerequisites
+  1497→- exact setup
+  1498→- exact launch command
+  1499→- browser URL
+  1500→- simulation controls
+  1501→- testing
+  1502→- benchmarks
+  1503→- troubleshooting.
+  1504→
+  1505→Also:
+  1506→
+  1507→docs/ARCHITECTURE.md
+  1508→docs/PROTOCOL.md
+  1509→docs/EXPERIMENTS.md
+  1510→docs/OPEN_SOURCE.md
+  1511→docs/DEMO_SCRIPT.md.
+  1512→
+  1513→==================================================
+  1514→36. DEVELOPER EXPERIENCE
+  1515→==================================================
+  1516→
+  1517→Target a clean launch experience.
+  1518→
+  1519→Desired:
+  1520→
+  1521→./scripts/setup.sh
+  1522→
+  1523→then:
+  1524→
+  1525→./scripts/dev.sh
+  1526→
+  1527→or:
+  1528→
+  1529→docker compose up
+  1530→
+  1531→then:
+  1532→
+  1533→simulation starts
+  1534→telemetry starts
+  1535→frontend starts.
+  1536→
+  1537→If complete Dockerization of Gazebo GUI is impractical:
+  1538→
+  1539→document the cleanest reproducible host workflow.
+  1540→
+  1541→Do not sacrifice actual functionality merely to force everything into Docker.
+  1542→
+  1543→==================================================
+  1544→37. DEFINITION OF DONE
+  1545→==================================================
+  1546→
+  1547→Do not call this MVP complete until:
+  1548→
+  1549→[ ] 10 AMRs launch.
+  1550→[ ] Robots receive and complete tasks.
+  1551→[ ] Narrow aisle constraints work.
+  1552→[ ] Intent messages are real.
+  1553→[ ] Conflict cells form.
+  1554→[ ] Reservations work.
+  1555→[ ] Prosocial routing changes at least some decisions.
+  1556→[ ] Fairness aging works.
+  1557→[ ] Contextual blockage propagates.
+  1558→[ ] JEC state is real.
+  1559→[ ] JEC failure does not halt fleet.
+  1560→[ ] Robot failure triggers reassignment.
+  1561→[ ] Congestion predictor produces real inference.
+  1562→[ ] Safety veto works.
+  1563→[ ] Live frontend receives real simulation state.
+  1564→[ ] Graph-of-Futures view works.
+  1565→[ ] Failure Lab works.
+  1566→[ ] Benchmarks can be executed.
+  1567→[ ] Results are persisted.
+  1568→[ ] Tests pass.
+  1569→[ ] No fake metrics.
+  1570→[ ] README setup works from clean environment.
+  1571→
+  1572→==================================================
+  1573→38. QUALITY BAR
+  1574→==================================================
+  1575→
+  1576→Reject:
+  1577→- TODO-heavy scaffold
+  1578→- fake dashboard data
+  1579→- hard-coded animated robot positions
+  1580→- non-functional buttons
+  1581→- disconnected UI
+  1582→- one giant Python script
+  1583→- central hidden fleet manager
+  1584→- random "AI" API integrations
+  1585→- LLM controlling robots
+  1586→- visual-only simulation
+  1587→- fabricated performance results
+  1588→- unlicensed copied assets.
+  1589→
+  1590→Prefer:
+  1591→- simple working algorithms
+  1592→- modular interfaces
+  1593→- strong typing
+  1594→- deterministic behavior
+  1595→- reproducibility
+  1596→- observability
+  1597→- explainability.
+  1598→
+  1599→==================================================
+  1600→39. WHEN SOMETHING FAILS
+  1601→==================================================
+  1602→
+  1603→Do not silently remove a feature.
+  1604→
+  1605→If dependency A fails:
+  1606→
+  1607→diagnose.
+  1608→
+  1609→Search official docs.
+  1610→
+  1611→Try compatible implementation B.
+  1612→
+  1613→Record significant architectural changes.
+  1614→
+  1615→Keep the core thesis intact.
+  1616→
+  1617→Do not spend hours preserving an unnecessary library.
+  1618→
+  1619→Functionality > dogmatic stack adherence.
+  1620→
+  1621→==================================================
+  1622→40. STARTING INSTRUCTIONS
+  1623→==================================================
+  1624→
+  1625→BEGIN NOW.
+  1626→
+  1627→First:
+  1628→
+  1629→1. inspect operating system, CPU/RAM/GPU, Docker, ROS, Python, Node, package managers
+  1630→2. inspect/install relevant agent skills
+  1631→3. inspect current directory/repository
+  1632→4. read the two design references
+  1633→5. audit the open-source robotics repos
+  1634→6. determine ROS/Gazebo compatibility
+  1635→7. create IMPLEMENTATION_STATUS.md
+  1636→8. write concise architecture decision record
+  1637→9. bootstrap the project
+  1638→10. immediately make the smallest simulation move
+  1639→11. proceed phase-by-phase until the entire MVP works.
+  1640→
+  1641→Do not stop after telling me what you intend to do.
+  1642→
+  1643→Use IMPLEMENTATION_STATUS.md continuously with:
+  1644→
+  1645→DONE
+  1646→CURRENT
+  1647→BLOCKED
+  1648→NEXT.
+  1649→
+  1650→At the end, provide:
+  1651→
+  1652→- exact launch instructions
+  1653→- exact URLs
+  1654→- what is genuinely functional
+  1655→- benchmark results obtained
+  1656→- limitations
+  1657→- failed experiments
+  1658→- repo structure
+  1659→- next highest-value improvements.
+  1660→
+  1661→THE USER WILL TEST THE RESULT.
+  1662→
+  1663→Build accordingly.

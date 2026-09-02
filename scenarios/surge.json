@@ -1,0 +1,27 @@
+{
+  "name": "surge",
+  "duration_s": 180.0,
+  "schedule": [
+    {
+      "t": 0.0,
+      "zone": "B",
+      "rate": 0.5,
+      "dur": 50.0,
+      "kind": "PICK_DROP"
+    },
+    {
+      "t": 55.0,
+      "zone": "B",
+      "rate": 0.35,
+      "dur": 60.0,
+      "kind": "PICK_DROP"
+    },
+    {
+      "t": 120.0,
+      "zone": "A",
+      "rate": 0.12,
+      "dur": 50.0,
+      "kind": "PICK_DROP"
+    }
+  ]
+}

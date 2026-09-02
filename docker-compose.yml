@@ -1,0 +1,21 @@
+version: "3.9"
+# Optional containerised deployment (host Docker required — see docker/README.md).
+services:
+  fleet:
+    build: docker/fleet
+    command: python3 -m robotics_ws.supervisor --seed 7
+    network_mode: host
+    volumes:
+      - ./configs:/app/configs
+      - ./scenarios:/app/scenarios
+      - ./models:/app/models
+  bridge:
+    build: docker/fleet
+    command: python3 -m robotics_ws.telemetry_bridge
+    network_mode: host
+    depends_on: [fleet]
+  dashboard:
+    build: docker/dashboard
+    network_mode: host
+    environment:
+      - BRIDGE_PORT=8010

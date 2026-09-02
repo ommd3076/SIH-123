@@ -1,0 +1,36 @@
+{
+  "dataset_rows": 8448,
+  "train_rows": 5913,
+  "eval_rows": 2535,
+  "split": "temporal 70/30",
+  "horizon_s": 5.0,
+  "mlp": {
+    "mae": 0.1911,
+    "rmse": 0.3148,
+    "accuracy": 0.9992,
+    "precision": 1.0,
+    "recall": 0.9623,
+    "f1": 0.9808,
+    "tp": 51,
+    "fp": 0,
+    "fn": 2,
+    "tn": 2482,
+    "n": 2535
+  },
+  "heuristic": {
+    "mae": 0.8327,
+    "rmse": 1.4633,
+    "accuracy": 0.8142,
+    "precision": 0.0996,
+    "recall": 0.9811,
+    "f1": 0.1809,
+    "tp": 52,
+    "fp": 470,
+    "fn": 1,
+    "tn": 2012,
+    "n": 2535
+  },
+  "mlp_beats_heuristic_mae": true,
+  "default_predictor": "mlp",
+  "note": "The default runtime predictor follows the evaluation: if the learned model does not beat the deterministic heuristic on held-out data, the heuristic remains the default and the MLP stays an experimental option (build prompt section 10)."
+}
