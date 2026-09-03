@@ -290,6 +290,9 @@ function render(
 
   // Scale bar
   drawScaleBar(ctx, ch, scale);
+
+  // Legend
+  if (snap) drawLegend(ctx, cw, ch, snap.robots.length);
 }
 
 function drawRacks(ctx: CanvasRenderingContext2D, map: WarehouseMap, X: (x: number) => number, Y: (y: number) => number, scale: number) {
@@ -776,6 +779,45 @@ function drawScaleBar(ctx: CanvasRenderingContext2D, ch: number, scale: number) 
   ctx.font = '500 10px var(--font-geist-mono, monospace)';
   ctx.textAlign = 'left';
   ctx.fillText('5 m', 12, ch - 20);
+}
+function drawLegend(ctx: CanvasRenderingContext2D, cw: number, ch: number, robotCount: number) {
+  const x = cw - 180;
+  const y = 12;
+  const lineH = 18;
+  ctx.fillStyle = 'rgba(245,242,234,0.95)';
+  ctx.strokeStyle = C.inkFaint;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, 170, 130, 6);
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.fillStyle = C.ink;
+  ctx.font = '600 11px var(--font-geist-mono, monospace)';
+  ctx.textAlign = 'left';
+  ctx.fillText('FLEET STATUS', x + 10, y + 18);
+  
+  ctx.font = '400 10px var(--font-geist-mono, monospace)';
+  ctx.fillText(`Active robots: ${robotCount}`, x + 10, y + 38);
+  
+  const states = [
+    { label: 'IDLE', color: STATE_COLOR.IDLE },
+    { label: 'MOVING', color: STATE_COLOR.MOVING },
+    { label: 'TO_PICKUP', color: STATE_COLOR.TO_PICKUP },
+    { label: 'TO_DROP', color: STATE_COLOR.TO_DROP },
+    { label: 'TO_CHARGE', color: STATE_COLOR.TO_CHARGE },
+    { label: 'CHARGING', color: STATE_COLOR.CHARGING },
+  ];
+  
+  states.forEach((s, i) => {
+    const yy = y + 55 + i * 12;
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.arc(x + 14, yy - 3, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = C.inkSoft;
+    ctx.fillText(s.label, x + 22, yy + 1);
+  });
 }
 
 function ghostPosition(map: WarehouseMap, r: RobotView, H: number): [number, number] | null {
