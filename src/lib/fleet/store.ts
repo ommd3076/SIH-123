@@ -43,7 +43,9 @@ export const useFleet = create<FleetStore>((set, get) => ({
     const start = async () => {
       const { io } = await import('socket.io-client');
       socket = io(`/?XTransformPort=${BRIDGE_PORT}`, {
-        transports: ['websocket', 'polling'],
+        // polling first: connects even on origins without websocket proxying,
+        // then engine.io upgrades to websocket when the path supports it.
+        transports: ['polling', 'websocket'],
         reconnection: true,
         reconnectionAttempts: 12,
         reconnectionDelay: 1500,

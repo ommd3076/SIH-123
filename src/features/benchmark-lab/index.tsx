@@ -51,7 +51,7 @@ export function BenchmarkLab() {
           setRunning(null);
           return;
         }
-        setRunning((prev) => (prev ? { ...prev, [id]: st } : prev));
+        setRunning((prev) => (prev ? { ...prev, [id]: { id, ...st } } : prev));
       } catch {
         return;
       }

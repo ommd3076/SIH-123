@@ -85,3 +85,26 @@ Work Log:
 Stage Summary:
 - All §37 definition-of-done items verified with evidence
 - Deliverable: complete repo at /home/z/my-project with live demo, benchmarks, edge-AI pipeline, tests, docs
+
+---
+Task ID: 16
+Agent: main (Super Z)
+Task: Fix all errors (post-restart session recovery)
+
+Work Log:
+- Audited all stacks: Next dev :3000 up, but Python live stack dead (supervisor + bridge :8010 processes lost with previous session)
+- Python venv had lost eclipse-zenoh + python-socketio; reinstalled (zenoh 1.10.0, python-socketio 5.16.4) via /home/z/.venv/bin/python -m pip
+- Restarted live stack via scripts (supervisor seed 7 -> 17 procs on Zenoh, bridge :8010); health/snapshot/metrics/results all live
+- Fixed TS2345 in src/features/benchmark-lab/index.tsx (poll stored {status} into {id,status} record -> spread { id, ...st })
+- Fixed tsconfig include **/*.ts pulling in platform skills/ tree -> added excludes (skills, robotics_ws, logs, results, datasets); removed typescript.ignoreBuildErrors from next.config.ts (builds now honest)
+- Added allowedDevOrigins: ["*.space-z.ai"] (fixes cross-origin dev warning from preview host)
+- Fixed browser runtime error "map fetch failed" + stuck "Connecting to the coordination mesh..." on direct-origin access:
+  root cause chain: Next 308-strips /socket.io/ -> /socket.io before rewrites; python-socketio (aiohttp) only serves trailing-slash route
+  fix: next.config.ts rewrites (XTransformPort=8010 has-condition) proxy /socket.io -> http://localhost:8010/socket.io/ (slash restored), /api/:path* -> bridge; store.ts transports now polling-first with WS upgrade
+- Verified in browser (agent-browser): zero page/console errors, mesh live t+394s, 10/10 robots, 6/6 JECs, tasks completing (12 active), JEC-J19 inspector with edge-AI predictor data, Benchmark Lab (4 charts + 12 runs) after TS fix
+- Full verification: tsc exit 0, eslint exit 0, pytest 46/46 pass, gateway :81 + direct :3000 both connect
+
+Stage Summary:
+- All errors fixed: TS error, dead live stack, missing venv deps, cross-origin warning, direct-origin socket/REST failure
+- Dashboard now works on any origin (direct, project Caddy :81, platform preview)
+- Honest build: ignoreBuildErrors removed; type-check scope corrected
