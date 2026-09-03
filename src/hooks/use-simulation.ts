@@ -5,6 +5,7 @@ interface SimState {
   robots: RobotView[];
   jecs: JecView[];
   time: number;
+  taskCounter: number;
 }
 
 interface UseSimOptions {
@@ -13,6 +14,17 @@ interface UseSimOptions {
   speed?: number;
   robotCount?: number;
 }
+
+interface Task {
+  id: string;
+  type: 'pickup' | 'drop' | 'charge';
+  fromNode: string;
+  toNode: string;
+  assignedRobot: string | null;
+  createdAt: number;
+}
+
+const taskQueue: Task[] = [];
 
 function findPath(map: WarehouseMap, fromNode: string, toNode: string): string[] {
   const adj = new Map<string, { to: string; edge: string; dir: number }[]>();
@@ -61,33 +73,23 @@ function randomSpawnPos(map: WarehouseMap): [number, number] {
 
 function createInitialRobots(map: WarehouseMap, count: number): RobotView[] {
   const robots: RobotView[] = [];
-  const nodeIds = map.nodes.filter(n => n.type === 'junction').map(n => n.id);
+  const junctionIds = map.nodes.filter(n => n.type === 'junction').map(n => n.id);
   for (let i = 0; i < count; i++) {
-    const startNode = nodeIds[Math.floor(Math.random() * nodeIds.length)];
-    const startNodeData = map.nodes.find(n => n.id === startNode)!;
+    const startNode = junctionIds[Math.floor(Math.random() * junctionIds.length)];
     const pos = randomSpawnPos(map);
-    const targetNode = nodeIds[Math.floor(Math.random() * nodeIds.length)];
-    const pathEdges = findPath(map, startNode, targetNode);
-    const route = pathEdges.map((edge, idx) => {
-      const e = map.edges.find(ed => ed.id === edge)!;
-      const nextNode = idx === 0 ? (e.u === startNode ? e.v : e.u) : 
-        (e.u === map.edges.find(ed => ed.id === pathEdges[idx-1])?.v ? e.v : e.u);
-      const dir = e.u === (idx === 0 ? startNode : map.edges.find(ed => ed.id === pathEdges[idx-1])?.v) ? 1 : -1;
-      return { edge, dir, eta_in: 0, eta_out: 0 };
-    });
     robots.push({
       robot: `R${(i + 1).toString().padStart(2, '0')}`,
       t: 0,
       pos,
-      edge: route[0]?.edge ?? '',
+      edge: '',
       s: 0,
-      dir: route[0]?.dir ?? 1,
+      dir: 1,
       node: startNode,
-      speed: 1.5,
-      battery: 1.0,
+      speed: 1.5 + Math.random() * 0.5,
+      battery: 0.7 + Math.random() * 0.3,
       state: 'IDLE',
       task_id: '',
-      route_head: [targetNode],
+      route_head: [],
       waiting: false,
       wait_s: 0,
       effective_priority: 1,
@@ -95,11 +97,7 @@ function createInitialRobots(map: WarehouseMap, count: number): RobotView[] {
       denials: 0,
       counters: {},
       stats: {},
-      intent: route.length ? { route: route.map((r, i) => ({
-        ...r,
-        eta_in: i * 2,
-        eta_out: (i + 1) * 2
-      })), targets: [{ resource: targetNode, eta: route.length * 2, dur: 5 }], urgency: 1, confidence: 0.9 } : null,
+      intent: null,
     });
   }
   return robots;
@@ -127,34 +125,72 @@ function createInitialJecs(map: WarehouseMap): JecView[] {
   }));
 }
 
-function stepRobot(robot: RobotView, map: WarehouseMap, dt: number, allRobots: RobotView[]): RobotView {
-  if (!robot.intent || robot.intent.route.length === 0) {
-    // Idle - pick new target occasionally
-    if (Math.random() < 0.002) {
-      const junctions = map.nodes.filter(n => n.type === 'junction').map(n => n.id);
-      const target = junctions[Math.floor(Math.random() * junctions.length)];
+function assignTasks(map: WarehouseMap, robots: RobotView[], time: number) {
+  const pickupNodes = map.nodes.filter(n => n.type === 'pickup').map(n => n.id);
+  const dropNodes = map.nodes.filter(n => n.type === 'drop').map(n => n.id);
+  const chargeNodes = map.nodes.filter(n => n.type === 'charge').map(n => n.id);
+  const idleRobots = robots.filter(r => r.state === 'IDLE' && !r.intent);
+  
+  for (const robot of idleRobots) {
+    // Low battery? Go charge
+    if (robot.battery < 0.25 && chargeNodes.length) {
+      const target = chargeNodes[Math.floor(Math.random() * chargeNodes.length)];
       const pathEdges = findPath(map, robot.node, target);
       if (pathEdges.length) {
-        return {
-          ...robot,
-          state: 'MOVING',
-          intent: {
-            route: pathEdges.map((edge, i) => {
-              const e = map.edges.find(ed => ed.id === edge)!;
-              return { edge, dir: e.u === (i === 0 ? robot.node : map.edges.find(ed => ed.id === pathEdges[i-1])?.v) ? 1 : -1, eta_in: i * 2, eta_out: (i + 1) * 2 };
-            }),
-            targets: [{ resource: target, eta: pathEdges.length * 2, dur: 5 }],
-            urgency: 1,
-            confidence: 0.9
-          },
-          route_head: [target],
+        robot.intent = {
+          route: pathEdges.map((edge, i) => {
+            const e = map.edges.find(ed => ed.id === edge)!;
+            return { edge, dir: e.u === (i === 0 ? robot.node : map.edges.find(ed => ed.id === pathEdges[i-1])?.v) ? 1 : -1, eta_in: i * 2, eta_out: (i + 1) * 2 };
+          }),
+          targets: [{ resource: target, eta: pathEdges.length * 2, dur: 10 }],
+          urgency: 1.5,
+          confidence: 0.9
         };
+        robot.state = 'TO_CHARGE';
+        robot.task_id = `charge-${Date.now()}`;
+        robot.route_head = [target];
+        continue;
       }
     }
+    
+    // Randomly pick up task
+    if (pickupNodes.length && dropNodes.length && Math.random() < 0.15) {
+      const fromNode = pickupNodes[Math.floor(Math.random() * pickupNodes.length)];
+      const toNode = dropNodes[Math.floor(Math.random() * dropNodes.length)];
+      
+      // Path: robot -> pickup -> drop
+      const toPickup = findPath(map, robot.node, fromNode);
+      const pickupToDrop = findPath(map, fromNode, toNode);
+      
+      if (toPickup.length && pickupToDrop.length) {
+        const fullRoute = [...toPickup, ...pickupToDrop];
+        robot.intent = {
+          route: fullRoute.map((edge, i) => {
+            const e = map.edges.find(ed => ed.id === edge)!;
+            let fromN = i === 0 ? robot.node : map.edges.find(ed => ed.id === fullRoute[i-1])?.v;
+            if (!fromN) fromN = map.edges.find(ed => ed.id === fullRoute[i-1])?.u;
+            return { edge, dir: e.u === fromN ? 1 : -1, eta_in: i * 2, eta_out: (i + 1) * 2 };
+          }),
+          targets: [
+            { resource: fromNode, eta: toPickup.length * 2, dur: 3 },
+            { resource: toNode, eta: fullRoute.length * 2, dur: 2 }
+          ],
+          urgency: 1,
+          confidence: 0.85
+        };
+        robot.state = 'TO_PICKUP';
+        robot.task_id = `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        robot.route_head = [fromNode, toNode];
+      }
+    }
+  }
+}
+
+function stepRobot(robot: RobotView, map: WarehouseMap, dt: number, allRobots: RobotView[]): RobotView {
+  if (!robot.intent || robot.intent.route.length === 0) {
     return { ...robot, t: robot.t + dt };
   }
 
-  // Move along current edge
   const currentEdge = robot.intent.route[0];
   if (!currentEdge) return { ...robot, t: robot.t + dt };
 
@@ -166,7 +202,7 @@ function stepRobot(robot: RobotView, map: WarehouseMap, dt: number, allRobots: R
     map.nodes.find(n => n.id === edge.v)!.y - map.nodes.find(n => n.id === edge.u)!.y
   );
 
-  const moveDist = robot.speed * dt * 1000; // m/s * dt(ms)
+  const moveDist = robot.speed * dt * 1000;
   const newS = Math.min(1, robot.s + moveDist / distance);
 
   // Check for collision with other robots on same edge
@@ -185,11 +221,54 @@ function stepRobot(robot: RobotView, map: WarehouseMap, dt: number, allRobots: R
   }
 
   if (newS >= 1) {
-    // Reached end of edge
     const nextNode = currentEdge.dir > 0 ? edge.v : edge.u;
     const remainingRoute = robot.intent.route.slice(1);
+    
     if (remainingRoute.length === 0) {
-      // Reached destination
+      // Reached destination - check if it's a task target
+      const targets = robot.intent.targets ?? [];
+      const currentTarget = targets[0];
+      
+      if (currentTarget && currentTarget.resource === nextNode) {
+        // At target node
+        if (robot.state === 'TO_PICKUP') {
+          // Switch to drop
+          robot.intent.targets.shift();
+          robot.state = 'TO_DROP';
+        } else if (robot.state === 'TO_DROP') {
+          // Task complete
+          return {
+            ...robot,
+            t: robot.t + dt,
+            pos: [map.nodes.find(n => n.id === nextNode)!.x, map.nodes.find(n => n.id === nextNode)!.y],
+            node: nextNode,
+            edge: '',
+            s: 0,
+            state: 'IDLE',
+            intent: null,
+            route_head: [],
+            task_id: '',
+            waiting: false,
+            wait_s: 0,
+          };
+        } else if (robot.state === 'TO_CHARGE' || robot.state === 'CHARGING') {
+          // Charging
+          return {
+            ...robot,
+            t: robot.t + dt,
+            pos: [map.nodes.find(n => n.id === nextNode)!.x, map.nodes.find(n => n.id === nextNode)!.y],
+            node: nextNode,
+            edge: '',
+            s: 0,
+            state: 'CHARGING',
+            intent: null,
+            route_head: [],
+            waiting: false,
+            wait_s: 0,
+          };
+        }
+      }
+      
       return {
         ...robot,
         t: robot.t + dt,
@@ -204,7 +283,7 @@ function stepRobot(robot: RobotView, map: WarehouseMap, dt: number, allRobots: R
         wait_s: 0,
       };
     }
-    // Continue to next edge
+    
     const nextEdge = remainingRoute[0];
     const nextEdgeData = map.edges.find(e => e.id === nextEdge.edge)!;
     return {
@@ -215,7 +294,7 @@ function stepRobot(robot: RobotView, map: WarehouseMap, dt: number, allRobots: R
       edge: nextEdge.edge,
       s: 0,
       dir: nextEdge.dir,
-      state: 'MOVING',
+      state: robot.state === 'TO_PICKUP' ? 'TO_PICKUP' : robot.state === 'TO_DROP' ? 'TO_DROP' : 'MOVING',
       intent: { ...robot.intent, route: remainingRoute },
       route_head: robot.route_head.slice(1),
       waiting: false,
@@ -237,8 +316,10 @@ function stepRobot(robot: RobotView, map: WarehouseMap, dt: number, allRobots: R
   let newState = robot.state;
   if (newBattery < 0.2 && newState !== 'TO_CHARGE' && newState !== 'CHARGING') {
     newState = 'TO_CHARGE';
-  } else if (newBattery < 0.15) {
-    newState = 'CHARGING';
+  } else if (newBattery < 0.15 && newState !== 'TO_CHARGE') {
+    newState = 'TO_CHARGE';
+  } else if (robot.state === 'CHARGING' && newBattery >= 0.95) {
+    newState = 'IDLE';
   }
 
   return {
@@ -247,14 +328,14 @@ function stepRobot(robot: RobotView, map: WarehouseMap, dt: number, allRobots: R
     pos: newPos,
     s: newS,
     state: newState,
-    battery: newState === 'CHARGING' ? Math.min(1, robot.battery + dt * 0.001) : newBattery,
+    battery: newState === 'CHARGING' ? Math.min(1, robot.battery + dt * 0.002) : newBattery,
     waiting: false,
     wait_s: 0,
   };
 }
 
-export function useSimulation({ map, enabled, speed = 1, robotCount = 12 }: UseSimOptions) {
-  const simRef = useRef<SimState>({ robots: [], jecs: [], time: 0 });
+export function useSimulation({ map, enabled, speed = 1, robotCount = 14 }: UseSimOptions) {
+  const simRef = useRef<SimState>({ robots: [], jecs: [], time: 0, taskCounter: 0 });
   const lastTimeRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
   const initializedRef = useRef(false);
@@ -281,6 +362,7 @@ export function useSimulation({ map, enabled, speed = 1, robotCount = 12 }: UseS
       robots: createInitialRobots(map, robotCount),
       jecs: createInitialJecs(map),
       time: 0,
+      taskCounter: 0,
     };
     initializedRef.current = true;
   }, [map, robotCount]);
@@ -289,8 +371,12 @@ export function useSimulation({ map, enabled, speed = 1, robotCount = 12 }: UseS
     if (!map) return;
     init();
     const { robots, jecs } = simRef.current;
+    
+    // Assign tasks periodically
+    assignTasks(map, robots, simRef.current.time);
+    
     const newRobots = robots.map(r => stepRobot(r, map, dt, robots));
-    simRef.current = { robots: newRobots, jecs, time: simRef.current.time + dt };
+    simRef.current = { robots: newRobots, jecs, time: simRef.current.time + dt, taskCounter: simRef.current.taskCounter };
   }, [map, init]);
 
   useEffect(() => {
