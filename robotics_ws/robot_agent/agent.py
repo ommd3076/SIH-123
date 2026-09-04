@@ -90,8 +90,17 @@ class RobotAgent(BaseAgent):
             *cfg.get("battery", {}).get("start_pct", [72, 96]))
         self.fairness = FairnessState(base_priority=1.0 + (self.rng.random() * 0.5))
         # explicit spawn position (zones are queueing spurs, not rings)
-        spawn = {sp["rid"]: sp for sp in self.wmap.spawn}
-        self.spawn_pos = tuple(spawn.get(rid, {}).get("pos", [0.0, 0.0]))
+        spawn_pos: Dict[str, Tuple[float, float]] = {}
+        for i, sp in enumerate(self.wmap.spawn):
+            sp_rid = sp.get("rid") or f"R{i + 1:02d}"
+            if "pos" in sp and isinstance(sp.get("pos"), (list, tuple)) and len(sp["pos"]) == 2:
+                spawn_pos[sp_rid] = (float(sp["pos"][0]), float(sp["pos"][1]))
+            elif "x" in sp and "y" in sp:
+                spawn_pos[sp_rid] = (float(sp["x"]), float(sp["y"]))
+            elif "node" in sp and sp["node"] in self.wmap.nodes:
+                n = self.wmap.nodes[sp["node"]]
+                spawn_pos[sp_rid] = (n.x, n.y)
+        self.spawn_pos = spawn_pos.get(rid, (0.0, 0.0))
         self.last_edge: Optional[str] = None
         self.entry_dir: int = 1
 

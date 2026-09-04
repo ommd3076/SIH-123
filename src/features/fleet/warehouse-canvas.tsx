@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFleet } from '@/lib/fleet/store';
-import { useSimulation } from '@/hooks/use-simulation';
 import type { RobotView, Snapshot, WarehouseMap, JecView } from '@/lib/fleet/types';
 
 /** Palette — warm research interface + semantic state colors. */
@@ -53,6 +52,8 @@ interface RenderOpts {
   selectedRobot: string | null;
   selectedJec: string | null;
   now: number;
+  nodeById: Record<string, { x: number; y: number; id: string; type: string; label?: string }>;
+  edgeById: Record<string, { id: string; u: string; v: string; length: number; type: string }>;
 }
 
 export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null, jec: string | null) => void }) {
@@ -65,19 +66,10 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
   const selectedRobot = useFleet((s) => s.selectedRobot);
   const selectedJec = useFleet((s) => s.selectedJec);
   const connected = useFleet((s) => s.connected);
-  const connect = useFleet((s) => s.connect);
   const select = onSelect ?? setSelection;
-
-  // Use simulation when not connected to backend
-  const { snapshot: simSnapshot } = useSimulation({ 
-    map, 
-    enabled: !connected && map !== null,
-    speed: 1.5,
-    robotCount: 14 
-  });
-
-  // Use real snapshot if connected, otherwise simulation
-  const activeSnapshot = connected ? snapshot : simSnapshot;
+  const activeSnapshot = snapshot;
+  const nodeById = useMemo(() => Object.fromEntries((map?.nodes ?? []).map((n) => [n.id, n])), [map]);
+  const edgeById = useMemo(() => Object.fromEntries((map?.edges ?? []).map((e) => [e.id, e])), [map]);
 
   const interp = useRef<Interp | null>(null);
   const trails = useRef<Record<string, [number, number][]>>({});
@@ -100,14 +92,6 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
   }, [activeSnapshot]);
 
   useEffect(() => {
-    // Auto-connect if not connected
-    if (!connected && map) {
-      const cleanup = connect();
-      return cleanup;
-    }
-  }, [connected, map, connect]);
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !map) return;
     const ctx = canvas.getContext('2d');
@@ -119,13 +103,13 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
       const snap = interp.current;
       render(ctx, canvas, map, snap, {
         futuresMode, horizon, trails: trails.current,
-        selectedRobot, selectedJec, now,
+        selectedRobot, selectedJec, now, nodeById, edgeById,
       });
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [map, futuresMode, horizon, selectedRobot, selectedJec]);
+  }, [map, futuresMode, horizon, selectedRobot, selectedJec, nodeById, edgeById]);
 
   const onClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -147,7 +131,7 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
     let bestJec: string | null = null;
     let bestJD = 1.3;
     for (const j of snap.jecs) {
-      const node = wmap.nodes.find((n) => n.id === j.junction);
+      const node = nodeById[j.junction];
       if (!node) continue;
       const d = Math.hypot(node.x - mx, node.y - my);
       if (d < bestJD) { bestJD = d; bestJec = j.jec; }
@@ -160,7 +144,7 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
     } else {
       select(null, null);
     }
-  }, [activeSnapshot, select]);
+  }, [activeSnapshot, select, nodeById]);
 
   return (
     <div className="relative w-full h-full">
@@ -173,7 +157,7 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
       />
       {!connected && map && (
         <div className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-100 text-amber-900 border border-amber-300 shadow-sm">
-          Simulation Mode — Demo
+          Waiting for telemetry bridge
         </div>
       )}
     </div>
@@ -265,7 +249,7 @@ function render(
   drawZones(ctx, map, X, Y, scale);
 
   // Draw narrow gate direction arrows
-  if (snap) drawGateArrows(ctx, map, snap, X, Y, scale);
+  if (snap) drawGateArrows(ctx, map, snap, opts, X, Y, scale);
 
   // Draw junction nodes
   drawJunctions(ctx, map, X, Y);
@@ -423,6 +407,7 @@ function drawGateArrows(
   ctx: CanvasRenderingContext2D,
   map: WarehouseMap,
   snap: Snapshot,
+  opts: RenderOpts,
   X: (x: number) => number,
   Y: (y: number) => number,
   scale: number,
@@ -433,8 +418,9 @@ function drawGateArrows(
     if (!a) continue;
     const gd = j.gate_state?.dir ?? 0;
     if (gd === 0) continue;
-    const south = map.nodes.find((n) => n.id === a.south)!;
-    const north = map.nodes.find((n) => n.id === a.north)!;
+    const south = opts.nodeById[a.south];
+    const north = opts.nodeById[a.north];
+    if (!south || !north) continue;
     const mid: [number, number] = [(south.x + north.x) / 2, (south.y + north.y) / 2];
     ctx.strokeStyle = 'rgba(232,161,58,0.9)';
     ctx.lineWidth = 2;
@@ -501,15 +487,15 @@ function drawFutures(
   for (const j of snap.jecs) {
     if (!j.alive) continue;
     for (const [res, val] of Object.entries(j.predicted ?? {})) {
-      const node = map.nodes.find((n) => n.id === res);
-      if (!node || val <= 0.05) continue;
+      const indexedNode = opts.nodeById[res];
+      if (!indexedNode || val <= 0.05) continue;
       const rad = 1.1 + Math.min(2.2, val) * 0.75;
-      const g = ctx.createRadialGradient(X(node.x), Y(node.y), 0, X(node.x), Y(node.y), rad * scale);
+      const g = ctx.createRadialGradient(X(indexedNode.x), Y(indexedNode.y), 0, X(indexedNode.x), Y(indexedNode.y), rad * scale);
       g.addColorStop(0, `rgba(232,161,58,${Math.min(0.5, 0.16 * val)})`);
       g.addColorStop(1, 'rgba(232,161,58,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(X(node.x), Y(node.y), rad * scale, 0, Math.PI * 2);
+      ctx.arc(X(indexedNode.x), Y(indexedNode.y), rad * scale, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -523,10 +509,11 @@ function drawFutures(
     ctx.beginPath();
     ctx.moveTo(X(r.pos[0]), Y(r.pos[1]));
     for (const step of r.intent.route) {
-      const e = map.edges.find((ed) => ed.id === step.edge);
+      const e = opts.edgeById[step.edge];
       if (!e) continue;
-      const nu = map.nodes.find((n) => n.id === e.u)!;
-      const nv = map.nodes.find((n) => n.id === e.v)!;
+      const nu = opts.nodeById[e.u];
+      const nv = opts.nodeById[e.v];
+      if (!nu || !nv) continue;
       const tx = step.dir > 0 ? nv.x : nu.x;
       const ty = step.dir > 0 ? nv.y : nu.y;
       ctx.lineTo(X(tx), Y(ty));
@@ -535,7 +522,7 @@ function drawFutures(
     ctx.setLineDash([]);
     
     if (H > 0) {
-      const g = ghostPosition(map, r, H);
+      const g = ghostPosition(r, H, opts);
       if (g) {
         ctx.strokeStyle = C.prediction;
         ctx.lineWidth = 1.5;
@@ -555,7 +542,7 @@ function drawFutures(
 
 function drawConflicts(
   ctx: CanvasRenderingContext2D,
-  map: WarehouseMap,
+  _map: WarehouseMap,
   snap: Snapshot,
   opts: RenderOpts,
   X: (x: number) => number,
@@ -563,7 +550,7 @@ function drawConflicts(
   scale: number,
 ) {
   for (const cell of snap.conflicts) {
-    const node = map.nodes.find((n) => n.id === cell.resource);
+    const node = opts.nodeById[cell.resource];
     if (!node) continue;
     const t = (opts.now / 600) % 1;
     const pulse = 1.3 + 0.35 * Math.sin(t * Math.PI * 2);
@@ -583,7 +570,7 @@ function drawConflicts(
 
 function drawReservations(
   ctx: CanvasRenderingContext2D,
-  map: WarehouseMap,
+  _map: WarehouseMap,
   snap: Snapshot,
   opts: RenderOpts,
   X: (x: number) => number,
@@ -593,7 +580,7 @@ function drawReservations(
   for (const j of snap.jecs) {
     for (const rv of j.reservations ?? []) {
       if (rv.state !== 'GRANTED' && rv.state !== 'ACTIVE') continue;
-      const node = map.nodes.find((n) => n.id === rv.resource);
+      const node = opts.nodeById[rv.resource];
       if (!node) continue;
       const tt = (opts.now / 700 + (rv.robot.charCodeAt(1) % 5) * 0.2) % 1;
       ctx.strokeStyle = 'rgba(12,166,120,0.55)';
@@ -611,7 +598,7 @@ function drawReservations(
 
 function drawJecMarkers(
   ctx: CanvasRenderingContext2D,
-  map: WarehouseMap,
+  _map: WarehouseMap,
   snap: Snapshot,
   opts: RenderOpts,
   X: (x: number) => number,
@@ -619,7 +606,7 @@ function drawJecMarkers(
   scale: number,
 ) {
   for (const j of snap.jecs) {
-    const node = map.nodes.find((n) => n.id === j.junction);
+    const node = opts.nodeById[j.junction];
     if (!node) continue;
     const size = 5;
     ctx.fillStyle = j.alive ? C.reservation : C.blocked;
@@ -652,7 +639,7 @@ function drawJecMarkers(
 
 function drawRobots(
   ctx: CanvasRenderingContext2D,
-  map: WarehouseMap,
+  _map: WarehouseMap,
   snap: Snapshot,
   interp: Interp | null,
   opts: RenderOpts,
@@ -661,20 +648,19 @@ function drawRobots(
   scale: number,
   alpha: number,
 ) {
-  function findPrev(robots: RobotView[], r: RobotView): RobotView | null {
-    return robots.find((p) => p.robot === r.robot) ?? null;
-  }
+  const prevByRobot = new Map((interp?.snapshot.robots ?? []).map((r) => [r.robot, r]));
   
   function lerp(a: number, b: number, t: number): number {
     return a + (b - a) * Math.max(0, Math.min(1, t));
   }
   
-  function headingAt(map: WarehouseMap, r: RobotView): [number, number] | null {
+  function headingAt(r: RobotView): [number, number] | null {
     if (!r.edge) return null;
-    const e = map.edges.find(ed => ed.id === r.edge);
+    const e = opts.edgeById[r.edge];
     if (!e) return null;
-    const nu = map.nodes.find(n => n.id === e.u)!;
-    const nv = map.nodes.find(n => n.id === e.v)!;
+    const nu = opts.nodeById[e.u];
+    const nv = opts.nodeById[e.v];
+    if (!nu || !nv) return null;
     const dx = nv.x - nu.x;
     const dy = nv.y - nu.y;
     const L = Math.hypot(dx, dy) || 1;
@@ -682,7 +668,7 @@ function drawRobots(
   }
 
   for (const r of snap.robots) {
-    const prev = interp ? findPrev(interp.snapshot.robots, r) : null;
+    const prev = interp ? prevByRobot.get(r.robot) ?? null : null;
     const px = prev ? lerp(prev.pos[0], r.pos[0], alpha) : r.pos[0];
     const py = prev ? lerp(prev.pos[1], r.pos[1], alpha) : r.pos[1];
     
@@ -732,7 +718,7 @@ function drawRobots(
     ctx.stroke();
     
     // Heading indicator
-    const heading = headingAt(map, r);
+    const heading = headingAt(r);
     if (heading) {
       ctx.strokeStyle = C.robotOutline;
       ctx.lineWidth = 2;
@@ -820,21 +806,22 @@ function drawLegend(ctx: CanvasRenderingContext2D, cw: number, ch: number, robot
   });
 }
 
-function ghostPosition(map: WarehouseMap, r: RobotView, H: number): [number, number] | null {
+function ghostPosition(r: RobotView, H: number, opts: RenderOpts): [number, number] | null {
   if (!r.intent || r.intent.route.length === 0) return null;
   let dist = 0;
   const targetDist = r.speed * H;
   for (const step of r.intent.route) {
-    const e = map.edges.find(ed => ed.id === step.edge);
+    const e = opts.edgeById[step.edge];
     if (!e) continue;
     const edgeLen = e.length || Math.hypot(
-      map.nodes.find(n => n.id === e.v)!.x - map.nodes.find(n => n.id === e.u)!.x,
-      map.nodes.find(n => n.id === e.v)!.y - map.nodes.find(n => n.id === e.u)!.y
+      (opts.nodeById[e.v]?.x ?? 0) - (opts.nodeById[e.u]?.x ?? 0),
+      (opts.nodeById[e.v]?.y ?? 0) - (opts.nodeById[e.u]?.y ?? 0)
     );
     if (dist + edgeLen >= targetDist) {
       const t = (targetDist - dist) / edgeLen;
-      const nu = map.nodes.find(n => n.id === e.u)!;
-      const nv = map.nodes.find(n => n.id === e.v)!;
+      const nu = opts.nodeById[e.u];
+      const nv = opts.nodeById[e.v];
+      if (!nu || !nv) return null;
       const dir = step.dir > 0 ? 1 : -1;
       return [nu.x + (nv.x - nu.x) * (dir > 0 ? t : 1 - t), nu.y + (nv.y - nu.y) * (dir > 0 ? t : 1 - t)];
     }
@@ -842,9 +829,10 @@ function ghostPosition(map: WarehouseMap, r: RobotView, H: number): [number, num
   }
   // At end of route
   const lastStep = r.intent.route[r.intent.route.length - 1];
-  const e = map.edges.find(ed => ed.id === lastStep.edge);
+  const e = opts.edgeById[lastStep.edge];
   if (e) {
-    const nv = map.nodes.find(n => n.id === (lastStep.dir > 0 ? e.v : e.u))!;
+    const nv = opts.nodeById[lastStep.dir > 0 ? e.v : e.u];
+    if (!nv) return null;
     return [nv.x, nv.y];
   }
   return null;

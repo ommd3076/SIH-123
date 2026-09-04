@@ -17,6 +17,26 @@ from robotics_ws.fleet_transport.zenoh_backend import make_backend     # noqa: E
 from robotics_ws.robot_agent.agent import RobotAgent                   # noqa: E402
 
 
+def build_spawn_index(wmap) -> dict[str, str]:
+    """Support both legacy {rid,node} and coordinate-only spawn entries."""
+    index: dict[str, str] = {}
+    spawns = list(wmap.spawn or [])
+    for i, sp in enumerate(spawns):
+        rid = sp.get("rid") or f"R{i + 1:02d}"
+        node = sp.get("node")
+        if node in wmap.nodes:
+            index[rid] = node
+            continue
+        if "x" in sp and "y" in sp:
+            x, y = float(sp["x"]), float(sp["y"])
+            nearest = min(
+                wmap.nodes.values(),
+                key=lambda n: (n.x - x) ** 2 + (n.y - y) ** 2,
+            )
+            index[rid] = nearest.id
+    return index
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rid", required=True)
@@ -28,7 +48,7 @@ def main():
 
     cfg = load_fleet_config(args.config)
     wmap = load_map(args.map)
-    spawn = {s["rid"]: s["node"] for s in wmap.spawn}
+    spawn = build_spawn_index(wmap)
 
     async def run():
         runtime = AsyncioRuntime(t0=0.0, scale=float(os.environ.get("SIM_SCALE", "1.0")))

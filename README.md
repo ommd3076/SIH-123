@@ -24,7 +24,10 @@ coordination modes.
 
 ```bash
 ./scripts/setup.sh    # python deps + frontend deps + smoke tests
-./scripts/dev.sh      # launches the full live stack
+./scripts/dev.sh --demo      # full live stack
+./scripts/dev.sh --headless  # fleet + bridge only
+./scripts/dev.sh --visual    # alias of --demo (ROS/Gazebo parity hook)
+./scripts/dev.sh --benchmark # benchmark run only
 ```
 
 Then open **http://localhost:3000** → click **“Launch live simulation”**.
@@ -92,6 +95,7 @@ Detailed docs:
 - `docs/OPEN_SOURCE.md` — audits of the repos we evaluated
 - `docs/DEMO_SCRIPT.md` — a 5-minute scripted demo walkthrough
 - `docs/RESEARCH_NOTES.md` — hypotheses, algorithms, limitations
+- `docs/ARCHITECTURE_AUDIT.md` — runtime profiling + KEEP/REWRITE/REMOVE/ADAPT audit
 
 ## Headless benchmarks & the edge-AI pipeline
 

@@ -120,10 +120,14 @@ class WarehouseMap:
 
         self.jecs: Dict[str, JecSpec] = {}
         for j in data.get("jecs", []):
-            self.jecs[j["id"]] = JecSpec(
-                id=j["id"], junction=j["junction"], gate=j.get("gate"),
+            jid = j["id"]
+            self.jecs[jid] = JecSpec(
+                id=jid, junction=j["junction"], gate=j.get("gate"),
                 covers=self._edges_touching(j["junction"]),
             )
+            for gate_id in j.get("aisle_ids", []):
+                if gate_id in self.aisles:
+                    self.aisles[gate_id].jec = jid
         self.zones_roles: Dict[str, str] = {k: v["role"] for k, v in data.get("zones", {}).items()}
         self.spawn: List[Dict] = data.get("spawn", [])
 

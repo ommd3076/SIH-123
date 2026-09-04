@@ -175,7 +175,20 @@ class DesFleet:
 
         # agents
         self.robots: List[RobotAgent] = []
-        spawn = {s["rid"]: s["node"] for s in self.wmap.spawn}
+        spawn: Dict[str, str] = {}
+        for i, sp in enumerate(self.wmap.spawn):
+            rid = sp.get("rid") or f"R{i + 1:02d}"
+            node = sp.get("node")
+            if node in self.wmap.nodes:
+                spawn[rid] = node
+                continue
+            if "x" in sp and "y" in sp:
+                x, y = float(sp["x"]), float(sp["y"])
+                nearest = min(
+                    self.wmap.nodes.values(),
+                    key=lambda n: (n.x - x) ** 2 + (n.y - y) ** 2,
+                )
+                spawn[rid] = nearest.id
         for i in range(self.cfg["fleet"]["robot_count"]):
             rid = f"R{i + 1:02d}"
             rng = random.Random(seed * 1000 + i)

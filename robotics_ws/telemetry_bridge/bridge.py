@@ -81,6 +81,8 @@ class BridgeAgent(BaseAgent):
         self.metrics_history: deque = deque(maxlen=240)
         self.wait_samples: List[float] = []
         self._sio = None
+        self.seq = 0
+        self._last_robot_fingerprint: Dict[str, Any] = {}
 
     def _wire(self) -> None:
         self.plane.subscribe("fleet/robot/*/heartbeat", self._on_hb)
@@ -179,17 +181,23 @@ class BridgeAgent(BaseAgent):
         self._prune()
         if self._sio:
             try:
-                snap = self.snapshot()
-                asyncio.run_coroutine_threadsafe(
-                    self._sio.emit("snapshot", snap), self._loop)
-                if int(self.t * 5) % 5 == 0:
+                self.seq += 1
+                delta = self.robot_delta()
+                if delta["robots"]:
+                    asyncio.run_coroutine_threadsafe(
+                        self._sio.emit("delta", delta), self._loop)
+                if self.seq % 5 == 0:
+                    snap = self.snapshot()
+                    asyncio.run_coroutine_threadsafe(
+                        self._sio.emit("snapshot", snap), self._loop)
                     asyncio.run_coroutine_threadsafe(
                         self._sio.emit("metrics", self.metrics()), self._loop)
-                evs = [e for e in list(self.events)[-8:]]
+                evs = []
+                while self.events and len(evs) < 20:
+                    evs.append(self.events.popleft())
                 if evs:
                     asyncio.run_coroutine_threadsafe(
                         self._sio.emit("event", evs), self._loop)
-                self.events.clear()
             except Exception:  # noqa: BLE001
                 pass
 
@@ -217,6 +225,7 @@ class BridgeAgent(BaseAgent):
     # ------------------------------------------------------------------
     def snapshot(self) -> Dict:
         return {
+            "seq": self.seq,
             "t": round(self.t, 2),
             "robots": [self._robot_view(r) for r in self.robots.values()],
             "jecs": [self._jec_view(j) for j in self.jecs.values()],
@@ -228,6 +237,44 @@ class BridgeAgent(BaseAgent):
             "context_events": list(self.context_events)[-20:],
             "supervisor": self.supervisor,
         }
+
+    def robot_delta(self) -> Dict:
+        patches: List[Dict[str, Any]] = []
+        alive = set(self.robots.keys())
+        for rid, m in self.robots.items():
+            fp = (
+                tuple(m.get("pos") or (0.0, 0.0)),
+                m.get("edge"), round(float(m.get("s", 0.0)), 3),
+                m.get("dir"), m.get("node"), m.get("state"),
+                m.get("task_id"), round(float(m.get("battery", 0.0)), 3),
+                bool(m.get("waiting")), round(float(m.get("wait_s", 0.0)), 2),
+            )
+            if self._last_robot_fingerprint.get(rid) == fp:
+                continue
+            self._last_robot_fingerprint[rid] = fp
+            patches.append({
+                "robot": rid,
+                "t": m.get("t"),
+                "pos": m.get("pos"),
+                "edge": m.get("edge"),
+                "s": m.get("s"),
+                "dir": m.get("dir"),
+                "node": m.get("node"),
+                "speed": m.get("speed"),
+                "battery": m.get("battery"),
+                "state": m.get("state"),
+                "task_id": m.get("task_id"),
+                "route_head": m.get("route_head"),
+                "waiting": m.get("waiting"),
+                "wait_s": m.get("wait_s"),
+                "effective_priority": m.get("effective_priority"),
+                "yields": m.get("yields"),
+                "denials": m.get("denials"),
+            })
+        for rid in list(self._last_robot_fingerprint):
+            if rid not in alive:
+                self._last_robot_fingerprint.pop(rid, None)
+        return {"seq": self.seq, "t": round(self.t, 2), "robots": patches}
 
     def _robot_view(self, m: Dict) -> Dict:
         rid = m.get("robot")

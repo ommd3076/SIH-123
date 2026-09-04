@@ -129,6 +129,7 @@ export interface ContextEventItem {
 }
 
 export interface Snapshot {
+  seq?: number;
   t: number;
   robots: RobotView[];
   jecs: JecView[];
@@ -139,6 +140,12 @@ export interface Snapshot {
   task_feed: TaskFeedItem[];
   context_events: ContextEventItem[];
   supervisor: { processes?: { name: string; alive: boolean; pid: number; cpu_pct: number; rss_mb: number }[] };
+}
+
+export interface TelemetryDelta {
+  seq: number;
+  t: number;
+  robots: Partial<RobotView & { robot: string }>[];
 }
 
 export interface LiveMetrics {
