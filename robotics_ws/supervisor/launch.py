@@ -88,7 +88,10 @@ class SupervisorAgent(BaseAgent):
 
     def tick(self) -> None:
         procs = []
-        hz = os.sysconf("SC_CLK_TCK")
+        try:
+            hz = os.sysconf("SC_CLK_TCK")
+        except (AttributeError, ValueError, OSError):
+            hz = 100  # non-POSIX fallback (Windows): User CPU ticks per second
         for name, p in self.children.items():
             alive = p.poll() is None
             st = self._proc_stats(p.pid) if alive else {"ticks": 0, "rss_mb": 0.0}
