@@ -26,6 +26,7 @@ class SafetyConfig:
     slow_separation_m: float = 1.5
     collision_horizon_s: float = 2.0
     emergency_stop_gap_m: float = 0.75
+    brake_decel_mss: float = 2.4     # must match robot braking authority
 
     @staticmethod
     def from_cfg(cfg: Dict) -> "SafetyConfig":
@@ -34,6 +35,7 @@ class SafetyConfig:
             slow_separation_m=cfg.get("slow_separation_m", 1.5),
             collision_horizon_s=cfg.get("collision_horizon_s", 2.0),
             emergency_stop_gap_m=cfg.get("emergency_stop_gap_m", 0.75),
+            brake_decel_mss=cfg.get("brake_decel_mss", 2.4),
         )
 
 
@@ -61,26 +63,78 @@ class PeerView:
     state: str = "IDLE"
 
     @staticmethod
-    def from_heartbeat(m: Dict) -> "PeerView":
+    def from_heartbeat(m: Dict, wmap=None, now: Optional[float] = None) -> "PeerView":
         p = m.get("pos", [0, 0])
+        x, y = float(p[0]), float(p[1])
+        unc = 0.0
+        if wmap is not None and now is not None:
+            # dead-reckon stale heartbeat positions (see peer_estimate):
+            # the safety layer must act on where the peer IS, not where it
+            # was up to a second ago.
+            x, y, _ = peer_estimate(wmap, m, now)
+            age = max(0.0, now - float(m.get("t", now)))
+            # residual maneuver uncertainty after projection (turns/stops
+            # break the constant-velocity assumption): grows with age,
+            # capped — projection already removed the systematic bias.
+            unc = round(min(0.4, float(m.get("speed", 0.0)) * age * 0.3), 3)
         return PeerView(
-            rid=m["robot"], x=float(p[0]), y=float(p[1]), speed=float(m.get("speed", 0.0)),
+            rid=m["robot"], x=x, y=y, speed=float(m.get("speed", 0.0)),
             edge=m.get("edge", ""), dir=int(m.get("dir", 0)), s=float(m.get("s", 0.0)),
+            uncertainty=unc,
             urgency=float(m.get("urgency", 0.0)),
             effective_priority=float(m.get("effective_priority", 0.0)),
             state=m.get("state", "IDLE"),
         )
 
 
+def peer_estimate(wmap: WarehouseMap, hb: Dict, now: float) -> Tuple[float, float, float]:
+    """Dead-reckoned peer position from a heartbeat (pure function).
+
+    Heartbeats publish at ~1-2 Hz while robots drive up to 1.6 m/s, so a raw
+    reported position lags reality by up to ~1 m — more than the 0.9 m
+    safety separation. Project the peer forward along its reported edge at
+    its reported speed (age capped at 2 s, distance clamped to the edge).
+    Returns (x, y, s_projected). Falls back to the raw report when the peer
+    has no usable edge state (parked at a node, dwelling in a zone).
+    """
+    raw = hb.get("pos", [0, 0])
+    x, y = float(raw[0]), float(raw[1])
+    s_raw = float(hb.get("s", 0.0))
+    age = now - float(hb.get("t", now))
+    edge = hb.get("edge") or ""
+    speed = float(hb.get("speed", 0.0) or 0.0)
+    if edge and edge in wmap.edges and 0.0 < age < 2.0 and speed > 0.01:
+        e = wmap.edges[edge]
+        s = min(e.length, max(0.0, s_raw + int(hb.get("dir", 1)) * speed * age))
+        x, y = wmap.world_pos(edge, s, int(hb.get("dir", 1)),
+                              wmap.lane_offset_for(edge))
+        return x, y, s
+    return x, y, s_raw
+
+
 def separation_check(me: Tuple[float, float], peers: List[PeerView],
-                     cfg: SafetyConfig) -> Optional[Tuple[str, str, float]]:
-    """Rule 1. Returns (veto_reason, peer_id, distance) or None if safe."""
+                     cfg: SafetyConfig, own_speed: float = 0.0) -> Optional[Tuple[str, str, float]]:
+    """Rule 1. Returns (veto_reason, peer_id, distance) or None if safe.
+
+    Braking-distance aware: vetoes when the gap is smaller than the minimum
+    separation PLUS the distance needed to stop from the current speed
+    (v^2 / 2a). A fixed 0.9 m threshold is physically insufficient — a robot
+    at 1.6 m/s needs ~0.53 m to brake, so commanding v=0 at 0.9 m still ends
+    near 0.4 m. The margin vanishes at creep speeds, so dense queues are
+    unaffected.
+
+    Staleness inflated: each peer carries an `uncertainty` radius (grown from
+    heartbeat age at perception time); the effective gap shrinks by it, so
+    stale tracks veto earlier. Fresh tracks (uncertainty 0) are unaffected.
+    """
+    stop_margin = (own_speed * own_speed) / (2.0 * cfg.brake_decel_mss) if own_speed > 0 else 0.0
+    limit = cfg.min_separation_m + stop_margin
     closest: Optional[Tuple[str, float]] = None
     for p in peers:
-        d = math.hypot(me[0] - p.x, me[1] - p.y)
+        d = math.hypot(me[0] - p.x, me[1] - p.y) - (p.uncertainty or 0.0)
         if closest is None or d < closest[1]:
             closest = (p.rid, d)
-    if closest and closest[1] < cfg.min_separation_m:
+    if closest and closest[1] < limit:
         return (VETO_SEPARATION, closest[0], round(closest[1], 2))
     return None
 
@@ -146,7 +200,9 @@ def collision_prediction(me: PeerView, peers: List[PeerView],
         if dist > cfg.collision_horizon_s * (me.speed + p.speed):
             continue
         # coarse check: distance shrinks below min separation within horizon?
-        t_hit = (dist - cfg.min_separation_m) / (me.speed + p.speed) if (me.speed + p.speed) > 0 else math.inf
+        # (peer uncertainty shortens the available room, like separation.)
+        t_hit = ((dist - (p.uncertainty or 0.0) - cfg.min_separation_m)
+                 / (me.speed + p.speed)) if (me.speed + p.speed) > 0 else math.inf
         if t_hit < cfg.collision_horizon_s:
             # deterministic: only the robot WITHOUT right of way vetoes
             if not right_of_way(me, p):
@@ -200,7 +256,7 @@ def validate_step(wmap: WarehouseMap, me: PeerView, peers: List[PeerView],
     vetoes: List[Dict] = []
     traffic = [p for p in peers if not _following(wmap, me, p)]
 
-    sep = separation_check((me.x, me.y), traffic, cfg)
+    sep = separation_check((me.x, me.y), traffic, cfg, own_speed=me.speed)
     if sep and not right_of_way(me, next(
             (p for p in traffic if p.rid == sep[1]), me)):
         vetoes.append({"rule": VETO_SEPARATION, "peer": sep[1], "value": sep[2]})
