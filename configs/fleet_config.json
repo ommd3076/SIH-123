@@ -44,7 +44,8 @@
     "min_separation_m": 0.9,
     "slow_separation_m": 1.5,
     "collision_horizon_s": 2.0,
-    "emergency_stop_gap_m": 0.75
+    "emergency_stop_gap_m": 0.75,
+    "brake_decel_mss": 2.4
   },
   "narrow_gate": {
     "min_ownership_s": 6.0,
