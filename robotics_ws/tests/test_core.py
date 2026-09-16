@@ -13,6 +13,7 @@ from robotics_ws.fleet_core.routing import (astar, k_alternatives,  # noqa: E402
                                             step_arrival_times)
 from robotics_ws.fleet_core.social import SocialWeights, evaluate_route, choose_route  # noqa: E402
 from robotics_ws.fleet_core.safety import (SafetyConfig, PeerView,  # noqa: E402
+                                           peer_estimate,
                                            separation_check, next_cell_capacity,
                                            narrow_direction_check, right_of_way,
                                            collision_prediction, validate_step)
@@ -26,8 +27,8 @@ MAP = WarehouseMap.load(os.path.join(ROOT, "configs", "warehouse_map.json"))
 # --------------------------------------------------------------- map
 class TestMap:
     def test_loads(self):
-        assert len(MAP.nodes) == 39
-        assert len(MAP.edges) == 49
+        assert len(MAP.nodes) == 62
+        assert len(MAP.edges) == 82
 
     def test_connected(self):
         ids = list(MAP.nodes)
@@ -46,11 +47,11 @@ class TestMap:
         assert seen == set(ids)
 
     def test_jec_specs(self):
-        assert len(MAP.jecs) == 6
-        assert MAP.jec_for_junction("J19") == "JEC-J19"
+        assert len(MAP.jecs) == 9
+        assert MAP.jec_for_junction("J21") == "JEC-01"
         assert MAP.jec_for_junction("J01") is None
-        assert MAP.jec_for_gate("NA2") == "JEC-J03"
-        assert MAP.jec_for_gate("NA1") is None
+        assert MAP.jec_for_gate("NA2") == "JEC-07"
+        assert MAP.jec_for_gate("NA1") == "JEC-06"
 
     def test_geometry(self):
         x, y = MAP.world_pos("SA1", 0.0, 1)
@@ -67,7 +68,8 @@ class TestMap:
         assert abs(y1 - y2) - 1.0 < 1e-6
 
     def test_narrow_aisle_membership(self):
-        assert MAP.edge_to_gate("NA2b") == "NA2"
+        assert MAP.edge_to_gate("NA2b1") == "NA2"
+        assert MAP.edge_to_gate("NA2b2") == "NA2"
         assert MAP.edge_to_gate("SA1") is None
 
 
@@ -76,7 +78,7 @@ class TestRouting:
     def test_astar_basic(self):
         r = astar(MAP, "J01", "J09")
         assert r is not None
-        assert route_length(MAP, r) == pytest.approx(36.0, abs=0.01)
+        assert route_length(MAP, r) == pytest.approx(42.0, abs=0.01)
 
     def test_astar_same_node(self):
         assert astar(MAP, "J01", "J01") == []
@@ -123,7 +125,7 @@ class TestSocialCost:
         r = astar(MAP, "J01", "J09")
         rc = evaluate_route(MAP, r, SocialWeights(), {}, {})
         assert rc.externality == 0.0
-        assert rc.own == pytest.approx(36.0 / 1.6, abs=0.5)
+        assert rc.own == pytest.approx(42.0 / 1.6, abs=0.5)
         assert rc.total > 0
 
     def test_externality_grows_with_conflicting_intents(self):
@@ -140,29 +142,31 @@ class TestSocialCost:
         assert loaded.externality > empty.externality
 
     def test_prosocial_choice_overrides_shortest(self):
-        # J02 -> J12: shortest is NA2 (21.3s); alternate is NA1 (23.8s, +2.5s).
-        # Three robots intend NA2 opposing within my horizon: entering NA2
-        # would block them the full traversal (~18.7s each) => externality
-        # dominates and the planner picks the slightly longer NA1 route.
-        start, goal = "J02", "J12"
+        # J34 -> J38: shortest is the NA2 corridor (12.0 m). Three robots
+        # intend NA2 within the prediction horizon: entering NA2 now would
+        # block them the full traversal (~12 s each) => near-term externality
+        # dominates and the planner picks the NA3 detour instead. Sharing
+        # that begins beyond the horizon is honestly discounted (short-horizon
+        # local approximation per the architecture).
+        start, goal = "J34", "J38"
         alts = k_alternatives(MAP, start, goal)
         assert len(alts) >= 2
         routes = {tuple(s["edge"] for s in r) for r in alts}
         assert any("NA2a" in key for key in routes)
-        assert any("NA1a" in key for key in routes)
+        assert any("NA3a" in key for key in routes)
         others = {
-            f"R0{i}": {"targets": [{"resource": "NA2", "eta": 0.5 + 0.4 * i, "dur": 18.0}],
+            f"R0{i}": {"targets": [{"resource": "NA2", "eta": 0.5 + 0.4 * i, "dur": 12.0}],
                        "route": [{"edge": "NA2a"}]}
             for i in (5, 6, 7)
         }
         weights = SocialWeights(externality=1.0)
         best, cost, expl = choose_route(MAP, alts, weights, others, {})
         best_edges = {s["edge"] for s in best}
-        assert "NA2a" not in best_edges           # avoided the contested aisle
-        assert "NA1a" in best_edges               # accepted the longer route
+        assert "NA2a" not in best_edges           # avoided the contested entry
+        assert "NA3a" in best_edges               # accepted the longer route
         na2_choice = [e for e in expl if "NA2a" in e["route"]]
-        na1_choice = [e for e in expl if "NA1a" in e["route"]]
-        assert na2_choice[0]["breakdown"]["externality"] > na1_choice[0]["breakdown"]["own_cost"]
+        na3_choice = [e for e in expl if "NA3a" in e["route"]]
+        assert na2_choice[0]["breakdown"]["externality"] > na3_choice[0]["breakdown"]["own_cost"]
         assert len(expl) == len(alts)
         assert "externality" in expl[0]["breakdown"]
 
@@ -188,6 +192,30 @@ class TestSafety:
         cfg = SafetyConfig()
         peers = [PeerView(rid="R02", x=9.0, y=4.0)]
         assert separation_check((5.0, 4.0), peers, cfg) is None
+
+    def test_separation_braking_margin(self):
+        # fixed 0.9 m is not enough at speed: 1.6 m/s needs ~0.53 m to stop
+        # (v^2/2a, a=2.4) so the veto must fire at ~1.43 m.
+        cfg = SafetyConfig()
+        peers = [PeerView(rid="R02", x=6.2, y=4.0, speed=0.0)]
+        assert separation_check((5.0, 4.0), peers, cfg, own_speed=0.0) is None
+        v = separation_check((5.0, 4.0), peers, cfg, own_speed=1.6)
+        assert v is not None and v[0] == "SEPARATION"
+        # ... but creeping queues are unaffected (margin vanishes at low speed)
+        assert separation_check((5.0, 4.0), peers, cfg, own_speed=0.3) is None
+        # stopped at the line: still vetoes inside the minimum separation
+        peers_close = [PeerView(rid="R02", x=5.4, y=4.0, speed=0.0)]
+        assert separation_check((5.0, 4.0), peers_close, cfg, own_speed=0.0) is not None
+
+    def test_separation_staleness_inflation(self):
+        # a stale track vetoes earlier than a fresh one at the same range:
+        # uncertainty shrinks the effective gap.
+        cfg = SafetyConfig()
+        fresh = [PeerView(rid="R02", x=6.3, y=4.0, speed=1.6, uncertainty=0.0)]
+        stale = [PeerView(rid="R02", x=6.3, y=4.0, speed=1.6, uncertainty=0.4)]
+        assert separation_check((5.0, 4.0), fresh, cfg, own_speed=0.0) is None
+        v = separation_check((5.0, 4.0), stale, cfg, own_speed=0.0)
+        assert v is not None and v[0] == "SEPARATION"
 
     def test_capacity_veto_narrow(self):
         v = next_cell_capacity(MAP, "NA1a", 1, "J02")
@@ -234,6 +262,35 @@ class TestSafety:
         assert "NARROW_DIRECTION" in rules
         assert "NEXT_CELL_CAPACITY" in rules
         assert "RESERVATION_OWNERSHIP" in rules
+
+    def test_peer_estimate_projects_along_edge(self):
+        # heartbeat at 2 Hz: a robot at 1.6 m/s moves 0.8 m between beats.
+        # peer_estimate must dead-reckon forward, not report the stale fix.
+        hb = {"robot": "R02", "t": 10.0, "pos": [4.0, 4.0], "edge": "SA1",
+              "s": 0.0, "dir": 1, "speed": 1.6}
+        x, y, s = peer_estimate(MAP, hb, now=10.5)
+        assert s == pytest.approx(0.8, abs=1e-9)
+        # SA1 runs J01(4,4) -> J02(10,4): dir+1 offsets to +y, dir-1 to -y,
+        # so opposing lanes stay 2*offset apart.
+        assert x == pytest.approx(4.8, abs=1e-6)
+        assert y == pytest.approx(4.0 + MAP.lane_offset_for("SA1"), abs=1e-6)
+
+    def test_peer_estimate_falls_back_without_edge(self):
+        hb = {"robot": "R03", "t": 5.0, "pos": [28.0, 2.0], "edge": "",
+              "s": 0.0, "dir": 1, "speed": 0.0, "node": "O1"}
+        x, y, s = peer_estimate(MAP, hb, now=9.9)
+        assert (x, y, s) == (28.0, 2.0, 0.0)
+
+    def test_from_heartbeat_projects_with_map_and_time(self):
+        hb = {"robot": "R02", "t": 10.0, "pos": [4.0, 4.0], "edge": "SA1",
+              "s": 0.0, "dir": 1, "speed": 1.6}
+        pv = PeerView.from_heartbeat(hb, MAP, now=10.5)
+        assert pv.x == pytest.approx(4.8, abs=1e-6)
+        assert pv.uncertainty >= 0.0
+        # backwards compatible: no map/now -> raw position
+        pv2 = PeerView.from_heartbeat(hb)
+        assert (pv2.x, pv2.y) == (4.0, 4.0)
+        assert pv2.uncertainty == 0.0
 
 
 # --------------------------------------------------------------- fairness
