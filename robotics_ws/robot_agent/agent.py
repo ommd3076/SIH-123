@@ -419,6 +419,28 @@ class RobotAgent(BaseAgent):
         return sum(1 for rid, hb in self.peers.items()
                    if hb.get("edge") in edges and hb.get("state") != "FAILED")
 
+    def _entry_spacing_ok(self, eid: str, dirn: int, gap: float = 1.5) -> bool:
+        """Entry-spacing gate: refuse to pull onto an edge when a
+        same-direction occupant is stopped/moving within `gap` metres of my
+        entry end. Capacity counts alone permit entering 0.2 m behind a
+        stopped leader — a latched body-overlap no veto can undo."""
+        e = self.wmap.edges.get(eid)
+        if e is None:
+            return False
+        # entry always starts at s=0 (position mapping resolves the end by
+        # direction: s=0 is the u end for dir+1, the v end for dir-1).
+        ex, ey = self.wmap.world_pos(eid, 0.0, dirn,
+                                     self.wmap.lane_offset_for(eid))
+        for rid, hb in self.peers.items():
+            if hb.get("state") == "FAILED":
+                continue
+            if hb.get("edge") != eid or hb.get("dir", 0) != dirn:
+                continue
+            px, py, _ = S.peer_estimate(self.wmap, hb, self.t)
+            if math.hypot(px - ex, py - ey) < gap:
+                return False
+        return True
+
     def _route_congestion(self, route: R.Route) -> float:
         """Estimated congestion cost along a route (for auction bids)."""
         if not route:
@@ -814,7 +836,8 @@ class RobotAgent(BaseAgent):
             for rid, hb in self.peers.items():
                 if hb.get("node") == self.node and hb.get("speed", 0) < 0.05:
                     continue          # co-parked robots at their own slots
-                d = math.hypot(hb["pos"][0] - cx, hb["pos"][1] - cy)
+                px, py, _ = S.peer_estimate(self.wmap, hb, self.t)
+                d = math.hypot(px - cx, py - cy)
                 if d < 1.15:
                     self.fairness.start_wait(self.t)
                     self.counters["waiting_s"] += self.tick_period
@@ -845,8 +868,13 @@ class RobotAgent(BaseAgent):
         occ = self._edge_occupancy(eid)
         cap_ok = occ < e.capacity if not self.flags.stop_and_wait else occ == 0
         p2p_win = self._p2p_junction_win if need_resv and not jec else True
+        # entry spacing: never pull onto an edge within 1.5 m behind a
+        # same-direction occupant. Capacity counts alone allow bumper-to-
+        # bumper entry (observed: 0.2 m entry gaps behind stopped leaders),
+        # which the motion vetoes can no longer undo once latched.
+        entry_ok = self._entry_spacing_ok(eid, dirn)
 
-        if gate_ok and resv_ok and cap_ok and p2p_win:
+        if gate_ok and resv_ok and cap_ok and p2p_win and entry_ok:
             # enter edge
             self.node = None
             self.edge = eid
@@ -871,6 +899,8 @@ class RobotAgent(BaseAgent):
                     self.counters["yields"] += 1
             elif not cap_ok:
                 self._veto(S.VETO_CAPACITY, {"edge": eid, "occupants": occ, "capacity": e.capacity})
+            elif not entry_ok:
+                self._veto(S.VETO_CAPACITY, {"edge": eid, "detail": "entry_spacing"})
 
     def _maybe_replan_blocked(self, eid: str) -> None:
         self._replan_accum += self.tick_period
@@ -934,8 +964,9 @@ class RobotAgent(BaseAgent):
                     rh = (0.0, 0.0)
                 me = self.position()
                 for rid, hb in self.peers.items():
-                    dx = hb["pos"][0] - me[0]
-                    dy = hb["pos"][1] - me[1]
+                    px, py, _ = S.peer_estimate(self.wmap, hb, self.t)
+                    dx = px - me[0]
+                    dy = py - me[1]
                     d = math.hypot(dx, dy)
                     if d < 2.2 and (dx * rh[0] + dy * rh[1]) > 0:
                         nominal = max(0.0, min(nominal, (d - 1.4) * 1.0))
@@ -965,12 +996,28 @@ class RobotAgent(BaseAgent):
             self.counters["distance_m"] += moved
             self.counters["move_s"] += dt
         # separation monitoring: collision (< 0.5m, robot bodies overlap) vs
-        # near-miss (< 0.74m, unsafe proximity) — both edge-triggered per peer
+        # near-miss (< 0.74m, unsafe proximity) — both edge-triggered per peer.
+        # Peer positions are dead-reckoned (S.peer_estimate): raw heartbeat
+        # positions lag reality by up to ~1 m. Projection removes the bias for
+        # steady motion but OVERSHOOTS peers that braked since their (stale)
+        # heartbeat — e.g. a correctly-yielding robot read 0.5 m closer than
+        # its true 0.76 m under 400 ms-delayed telemetry. So a collision
+        # latches only on corroborated evidence: fresh tracks (age < 0.6 s)
+        # count on projection alone; stale tracks additionally require the
+        # RAW report within 0.65 m (a true overlap satisfies both; a
+        # projection overshoot does not). Vetoes stay aggressive on
+        # projection alone — a false-positive veto is a harmless stop, a
+        # false-positive collision count is a dishonest metric.
         me = self.position()
         for rid, hb in self.peers.items():
-            d = math.hypot(hb["pos"][0] - me[0], hb["pos"][1] - me[1])
+            px, py, _ = S.peer_estimate(self.wmap, hb, self.t)
+            d = math.hypot(px - me[0], py - me[1])
+            age = self.t - hb.get("t", self.t)
+            raw = hb.get("pos", [0, 0])
+            d_raw = math.hypot(raw[0] - me[0], raw[1] - me[1])
+            corroborated = (age < 0.6) or (d_raw < 0.65)
             self._min_gap_seen = min(self._min_gap_seen, d)
-            if d < 0.5 and rid not in self._collision_latched:
+            if d < 0.5 and corroborated and rid not in self._collision_latched:
                 self._collision_latched.add(rid)
                 self.counters["collisions"] += 1
                 self.emit("collision", {"peer": rid, "gap": round(d, 2),
@@ -1055,8 +1102,9 @@ class RobotAgent(BaseAgent):
             return True
         me = self.position()
         for rid, hb in self.peers.items():
-            dx = hb["pos"][0] - me[0]
-            dy = hb["pos"][1] - me[1]
+            px, py, _ = S.peer_estimate(self.wmap, hb, self.t)
+            dx = px - me[0]
+            dy = py - me[1]
             if math.hypot(dx, dy) < radius and (dx * h[0] + dy * h[1]) > 0:
                 return False
         return True
@@ -1076,8 +1124,9 @@ class RobotAgent(BaseAgent):
             pe = hb.get("edge") or ""
             if not pe or hb.get("state") == "FAILED":
                 continue
-            dx = hb["pos"][0] - me_pos[0]
-            dy = hb["pos"][1] - me_pos[1]
+            px, py, _ = S.peer_estimate(self.wmap, hb, self.t)
+            dx = px - me_pos[0]
+            dy = py - me_pos[1]
             d = math.hypot(dx, dy)
             if d > 3.5:
                 continue
@@ -1096,7 +1145,8 @@ class RobotAgent(BaseAgent):
         return nominal
 
     def _safety_vetoes(self, v: float) -> List[Dict]:
-        peers = [S.PeerView.from_heartbeat(hb) for hb in self.peers.values()]
+        peers = [S.PeerView.from_heartbeat(hb, self.wmap, self.t)
+                 for hb in self.peers.values()]
         me = S.PeerView(rid=self.id, x=self.position()[0], y=self.position()[1],
                         speed=v, edge=self.edge or "", dir=self.dir,
                         urgency=self.fairness.urgency,
@@ -1177,14 +1227,15 @@ class RobotAgent(BaseAgent):
                 continue
             if hb.get("node") == node:
                 return False                      # parked at the junction node
-            d = math.hypot(hb["pos"][0] - nx, hb["pos"][1] - ny)
+            px, py, ps_proj = S.peer_estimate(self.wmap, hb, self.t)
+            d = math.hypot(px - nx, py - ny)
             pe = hb.get("edge") or ""
             if pe and my_head != (0.0, 0.0):
                 try:
                     h2 = _heading(self.wmap, pe, hb.get("dir", 1))
                     if my_head[0] * h2[0] + my_head[1] * h2[1] > 0.9:
-                        dx = hb["pos"][0] - me_x
-                        dy = hb["pos"][1] - me_y
+                        dx = px - me_x
+                        dy = py - me_y
                         if d < 3.5 and (dx * my_head[0] + dy * my_head[1]) > 0:
                             continue              # my lane leader (convoy)
                 except KeyError:
@@ -1213,7 +1264,7 @@ class RobotAgent(BaseAgent):
             pd = hb.get("dir", 1)
             try:
                 end = self.wmap.node_of_edge_end(pe, pd)
-                remain = self.wmap.edges[pe].length - hb.get("s", 0.0)
+                remain = self.wmap.edges[pe].length - ps_proj
             except KeyError:
                 continue
             if end == node and remain < 2.5 and d < box * 1.8:
@@ -1224,10 +1275,11 @@ class RobotAgent(BaseAgent):
 
     def _junction_empty_p2p(self, node: str) -> bool:
         """When outbidding a JEC reservation: is the junction physically empty
-        (heartbeat positions) — the deterministic safety backstop."""
+        (dead-reckoned heartbeat positions) — the deterministic safety backstop."""
         nx, ny = self.wmap.node_pos(node)
         for rid, hb in self.peers.items():
-            if math.hypot(hb["pos"][0] - nx, hb["pos"][1] - ny) < self.wmap.junction_box:
+            px, py, _ = S.peer_estimate(self.wmap, hb, self.t)
+            if math.hypot(px - nx, py - ny) < self.wmap.junction_box:
                 return False
         return True
 
