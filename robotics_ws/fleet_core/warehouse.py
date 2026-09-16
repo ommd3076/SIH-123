@@ -71,6 +71,7 @@ class NarrowAisle:
     south: str
     north: str
     jec: Optional[str] = None
+    junction: str = ""      # anchor junction shared with the responsible JEC
 
 
 @dataclass
@@ -109,7 +110,7 @@ class WarehouseMap:
         for a in data.get("narrow_aisles", []):
             self.aisles[a["id"]] = NarrowAisle(
                 id=a["id"], edges=a["edges"], south=a["south"], north=a["north"],
-                jec=a.get("jec"),
+                jec=a.get("jec"), junction=a.get("junction", ""),
             )
 
         # adjacency: node -> [(edge_id, neighbor)]  (needed by JEC coverage)
@@ -124,6 +125,18 @@ class WarehouseMap:
                 id=j["id"], junction=j["junction"], gate=j.get("gate"),
                 covers=self._edges_touching(j["junction"]),
             )
+        # junction-anchored JECs own their narrow-aisle gate: derive the
+        # aisle -> JEC association when the map does not state it explicitly.
+        _jec_by_junction = {j.junction: j.id for j in self.jecs.values()}
+        for a in self.aisles.values():
+            if not a.jec and a.junction and a.junction in _jec_by_junction:
+                a.jec = _jec_by_junction[a.junction]
+        # ... and the inverse: a JEC anchored at an aisle junction manages
+        # that aisle's direction gate (else gate requests are dropped as
+        # "not my jurisdiction" and robots wait forever).
+        for a in self.aisles.values():
+            if a.jec and a.jec in self.jecs and not self.jecs[a.jec].gate:
+                self.jecs[a.jec].gate = a.id
         self.zones_roles: Dict[str, str] = {k: v["role"] for k, v in data.get("zones", {}).items()}
         self.spawn: List[Dict] = data.get("spawn", [])
 
@@ -196,11 +209,20 @@ class WarehouseMap:
         return n.x, n.y
 
     def lane_offset_for(self, edge_id: str) -> float:
-        """Visual lane offset: wide aisles offset right, narrow aisles centreline."""
+        """Visual lane offset: right-hand traffic lane centre.
+
+        Wide aisles carry two-way traffic in marked lanes: lane centre sits
+        at half-width minus robot half-width (~0.4 m) minus wall margin
+        (~0.35 m), so opposing lanes stay ~1.5 m apart on a 3 m aisle and a
+        wide-lane traveller keeps >= 0.7 m from an adjacent narrow-aisle
+        centreline (above the 0.5 m body-overlap threshold, inside the 0.9 m
+        caution band where the safety layer legitimately engages).
+        Narrow aisles are single-file: centreline.
+        """
         e = self.edges[edge_id]
         if e.is_narrow:
             return 0.0
-        return min(0.55, max(0.25, (e.width - 1.6) * 0.25))
+        return min(0.9, max(0.3, e.width / 2.0 - 0.75))
 
     # ------------------------------------------------------------------
     def pickups(self) -> List[str]:
