@@ -104,7 +104,7 @@ class TestBlockagePropagation:
         # nobody sits inside the blocked aisle at the end
         for r in fleet.robots:
             if r.edge:
-                assert r.edge not in {"NA2a", "NA2b", "NA2c"}, \
+                assert r.edge not in {"NA2a", "NA2b1", "NA2b2", "NA2c"}, \
                     f"{r.id} still inside blocked aisle"
         # unblock clears
         fleet.apply_chaos("UNBLOCK_AISLE", {"resource": "NA2"})
@@ -116,8 +116,8 @@ class TestBlockagePropagation:
 class TestJecFailureFallback:
     def test_killing_jec_does_not_halt_fleet(self):
         chaos = [
-            {"t": 20.0, "cmd": "KILL_JEC", "args": {"jec": "JEC-J19"}},
-            {"t": 45.0, "cmd": "RESTART_JEC", "args": {"jec": "JEC-J19"}},
+            {"t": 20.0, "cmd": "KILL_JEC", "args": {"jec": "JEC-04"}},
+            {"t": 45.0, "cmd": "RESTART_JEC", "args": {"jec": "JEC-04"}},
         ]
         fleet = make_fleet(mode=MODE_FULL, seed=31, duration=240.0, chaos=chaos)
         # measure liveness DURING the JEC-down window (20s -> 45s)
@@ -133,14 +133,14 @@ class TestJecFailureFallback:
         # tasks complete across the scenario (fallback coordination works)
         assert fleet.allocator.counters["completed"] >= 1
         # the JEC is back online at the end
-        jec = [j for j in fleet.jecs if j.id == "JEC-J19"][0]
+        jec = [j for j in fleet.jecs if j.id == "JEC-04"][0]
         assert jec.started
 
     def test_robots_detect_jec_offline(self):
-        chaos = [{"t": 10.0, "cmd": "KILL_JEC", "args": {"jec": "JEC-J06"}}]
+        chaos = [{"t": 10.0, "cmd": "KILL_JEC", "args": {"jec": "JEC-01"}}]
         fleet = make_fleet(mode=MODE_FULL, seed=33, duration=30.0, chaos=chaos)
         run_robots(fleet, 25.0)
-        detected = any(r.context_affects("JEC_OFFLINE", "JEC-J06")
+        detected = any(r.context_affects("JEC_OFFLINE", "JEC-01")
                        or any(ev.ev_type == "JEC_OFFLINE" for ev in r.active_context())
                        for r in fleet.robots)
         assert detected, "no robot detected JEC_OFFLINE"
