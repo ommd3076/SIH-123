@@ -24,7 +24,8 @@ coordination modes.
 
 ```bash
 ./scripts/setup.sh    # python deps + frontend deps + smoke tests
-./scripts/dev.sh      # launches the full live stack
+./scripts/dev.sh      # launches the full live stack (Linux / macOS)
+# Or on Windows PowerShell: .\scripts\dev.ps1 (see docs/WINDOWS_SETUP.md)
 ```
 
 Then open **http://localhost:3000** → click **“Launch live simulation”**.
