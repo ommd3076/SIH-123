@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { FleetLogo } from '@/components/fleet-logo';
 
 /** Abstract network-topology animation for the hero (decorative, clearly
  * distinct from the live view): pulses travel along a coordination graph. */
@@ -131,14 +132,28 @@ const BEATS = [
 export function Landing({ onLaunch }: { onLaunch: () => void }) {
   const reduced = useReducedMotion();
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#F5F2EA' }}>
+    <div className="min-h-screen flex flex-col bg-[#F7F6F2]">
+      {/* Landing Navbar */}
+      <header className="border-b border-slate-200/80 bg-white/70 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <FleetLogo size="md" />
+          <button
+            onClick={onLaunch}
+            className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 shadow-sm shadow-orange-500/20 transition-all hover:scale-102 active:scale-98"
+          >
+            Launch Live Grid
+            <span>→</span>
+          </button>
+        </div>
+      </header>
+
       <main className="flex-1">
         {/* HERO */}
-        <section className="relative border-b border-ink-faint overflow-hidden">
+        <section className="relative border-b border-slate-200/80 overflow-hidden">
           <div className="absolute inset-0 opacity-90">
             <TopologyHero />
           </div>
-          <div className="relative max-w-6xl mx-auto px-6 md:px-10 pt-24 pb-20 md:pt-36 md:pb-28">
+          <div className="relative max-w-6xl mx-auto px-6 md:px-10 pt-20 pb-20 md:pt-32 md:pb-28">
             <motion.div
               initial={reduced ? false : { opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
