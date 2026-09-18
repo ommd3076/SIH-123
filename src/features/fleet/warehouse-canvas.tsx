@@ -68,6 +68,9 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
   const connect = useFleet((s) => s.connect);
   const select = onSelect ?? setSelection;
 
+  const setSnapshot = useFleet((s) => s.setSnapshot);
+  const setMetrics = useFleet((s) => s.setMetrics);
+
   // Use simulation when not connected to backend
   const { snapshot: simSnapshot } = useSimulation({ 
     map, 
@@ -96,8 +99,31 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
         }
       }
       interp.current = { snapshot: activeSnapshot, t0: performance.now() };
+
+      if (!connected && simSnapshot) {
+        setSnapshot(simSnapshot);
+        const activeTasks = simSnapshot.robots.filter(r => r.state === 'TO_PICKUP' || r.state === 'TO_DROP').length;
+        setMetrics({
+          t: simSnapshot.t,
+          robots_online: simSnapshot.robots.length,
+          jecs_online: simSnapshot.jecs.length,
+          tasks_done: Math.floor(simSnapshot.t * 0.4),
+          tasks_pending: 2,
+          tasks_active: activeTasks,
+          mean_wait_s: 0.8,
+          p95_wait_s: 1.2,
+          distance_m: Math.floor(simSnapshot.t * 1.5),
+          energy_j: Math.floor(simSnapshot.t * 22),
+          vetoes: Math.floor(simSnapshot.t * 0.1),
+          replans: 0,
+          conflicts_active: 0,
+          messages_per_s: 14.5,
+          bytes_per_s: 2400,
+          collisions: 0,
+        });
+      }
     }
-  }, [activeSnapshot]);
+  }, [activeSnapshot, connected, simSnapshot, setSnapshot, setMetrics]);
 
   useEffect(() => {
     // Auto-connect if not connected
@@ -296,14 +322,17 @@ function render(
 }
 
 function drawRacks(ctx: CanvasRenderingContext2D, map: WarehouseMap, X: (x: number) => number, Y: (y: number) => number, scale: number) {
+  if (!map || !map.edges || !map.nodes) return;
   // Dynamically compute rack columns from narrow aisle edges
   const narrowEdges = map.edges.filter(e => e.type === 'aisle_narrow');
   const aisleXs = new Set<number>();
   for (const e of narrowEdges) {
-    const u = map.nodes.find(n => n.id === e.u)!;
-    const v = map.nodes.find(n => n.id === e.v)!;
-    aisleXs.add(u.x);
-    aisleXs.add(v.x);
+    const uId = e.u ?? (e as any).from;
+    const vId = e.v ?? (e as any).to;
+    const u = map.nodes.find(n => n.id === uId);
+    const v = map.nodes.find(n => n.id === vId);
+    if (u && typeof u.x === 'number') aisleXs.add(u.x);
+    if (v && typeof v.x === 'number') aisleXs.add(v.x);
   }
   const sortedXs = Array.from(aisleXs).sort((a, b) => a - b);
   
@@ -311,9 +340,9 @@ function drawRacks(ctx: CanvasRenderingContext2D, map: WarehouseMap, X: (x: numb
   for (let i = 0; i < sortedXs.length - 1; i += 2) {
     const x0 = sortedXs[i];
     const x1 = sortedXs[i + 1];
-    if (x1 - x0 > 0.5 && x1 - x0 < 4) {
+    if (x1 - x0 > 0.5 && x1 - x0 < 6) {
       ctx.fillStyle = C.rack;
-      ctx.fillRect(X(x0), Y(6), (x1 - x0) * scale, 16 * scale);
+      ctx.fillRect(X(x0), Y(22), (x1 - x0) * scale, 16 * scale);
       ctx.strokeStyle = C.rackLine;
       ctx.lineWidth = 1;
       for (let yy = 7; yy < 22; yy += 1.2) {
@@ -335,9 +364,13 @@ function drawEdges(
   edgeOcc: Record<string, number>,
   blockedEdges: Set<string>,
 ) {
+  if (!map || !map.edges || !map.nodes) return;
   for (const e of map.edges) {
-    const nu = map.nodes.find((n) => n.id === e.u)!;
-    const nv = map.nodes.find((n) => n.id === e.v)!;
+    const uId = e.u ?? (e as any).from;
+    const vId = e.v ?? (e as any).to;
+    const nu = map.nodes.find((n) => n.id === uId);
+    const nv = map.nodes.find((n) => n.id === vId);
+    if (!nu || !nv) continue;
     const blocked = blockedEdges.has(e.id);
     const occ = edgeOcc[e.id] ?? 0;
     const narrow = e.type === 'aisle_narrow' || e.type === 'dock' || e.type === 'charge_link' || e.type === 'staging_link';
@@ -427,14 +460,15 @@ function drawGateArrows(
   Y: (y: number) => number,
   scale: number,
 ) {
-  for (const j of snap.jecs) {
+  for (const j of snap.jecs || []) {
     if (!j.gate || !j.alive) continue;
-    const a = map.aisles[j.gate];
+    const a = map.aisles?.[j.gate];
     if (!a) continue;
     const gd = j.gate_state?.dir ?? 0;
     if (gd === 0) continue;
-    const south = map.nodes.find((n) => n.id === a.south)!;
-    const north = map.nodes.find((n) => n.id === a.north)!;
+    const south = map.nodes.find((n) => n.id === a.south);
+    const north = map.nodes.find((n) => n.id === a.north);
+    if (!south || !north) continue;
     const mid: [number, number] = [(south.x + north.x) / 2, (south.y + north.y) / 2];
     ctx.strokeStyle = 'rgba(232,161,58,0.9)';
     ctx.lineWidth = 2;
@@ -525,8 +559,11 @@ function drawFutures(
     for (const step of r.intent.route) {
       const e = map.edges.find((ed) => ed.id === step.edge);
       if (!e) continue;
-      const nu = map.nodes.find((n) => n.id === e.u)!;
-      const nv = map.nodes.find((n) => n.id === e.v)!;
+      const uId = e.u ?? (e as any).from;
+      const vId = e.v ?? (e as any).to;
+      const nu = map.nodes.find((n) => n.id === uId);
+      const nv = map.nodes.find((n) => n.id === vId);
+      if (!nu || !nv) continue;
       const tx = step.dir > 0 ? nv.x : nu.x;
       const ty = step.dir > 0 ? nv.y : nu.y;
       ctx.lineTo(X(tx), Y(ty));
@@ -673,8 +710,11 @@ function drawRobots(
     if (!r.edge) return null;
     const e = map.edges.find(ed => ed.id === r.edge);
     if (!e) return null;
-    const nu = map.nodes.find(n => n.id === e.u)!;
-    const nv = map.nodes.find(n => n.id === e.v)!;
+    const uId = e.u ?? (e as any).from;
+    const vId = e.v ?? (e as any).to;
+    const nu = map.nodes.find(n => n.id === uId);
+    const nv = map.nodes.find(n => n.id === vId);
+    if (!nu || !nv) return null;
     const dx = nv.x - nu.x;
     const dy = nv.y - nu.y;
     const L = Math.hypot(dx, dy) || 1;
@@ -821,20 +861,20 @@ function drawLegend(ctx: CanvasRenderingContext2D, cw: number, ch: number, robot
 }
 
 function ghostPosition(map: WarehouseMap, r: RobotView, H: number): [number, number] | null {
-  if (!r.intent || r.intent.route.length === 0) return null;
+  if (!r.intent || !r.intent.route || r.intent.route.length === 0) return null;
   let dist = 0;
   const targetDist = r.speed * H;
   for (const step of r.intent.route) {
     const e = map.edges.find(ed => ed.id === step.edge);
     if (!e) continue;
-    const edgeLen = e.length || Math.hypot(
-      map.nodes.find(n => n.id === e.v)!.x - map.nodes.find(n => n.id === e.u)!.x,
-      map.nodes.find(n => n.id === e.v)!.y - map.nodes.find(n => n.id === e.u)!.y
-    );
+    const uId = e.u ?? (e as any).from;
+    const vId = e.v ?? (e as any).to;
+    const nu = map.nodes.find(n => n.id === uId);
+    const nv = map.nodes.find(n => n.id === vId);
+    if (!nu || !nv) continue;
+    const edgeLen = e.length || Math.hypot(nv.x - nu.x, nv.y - nu.y) || 1.0;
     if (dist + edgeLen >= targetDist) {
       const t = (targetDist - dist) / edgeLen;
-      const nu = map.nodes.find(n => n.id === e.u)!;
-      const nv = map.nodes.find(n => n.id === e.v)!;
       const dir = step.dir > 0 ? 1 : -1;
       return [nu.x + (nv.x - nu.x) * (dir > 0 ? t : 1 - t), nu.y + (nv.y - nu.y) * (dir > 0 ? t : 1 - t)];
     }
@@ -844,8 +884,9 @@ function ghostPosition(map: WarehouseMap, r: RobotView, H: number): [number, num
   const lastStep = r.intent.route[r.intent.route.length - 1];
   const e = map.edges.find(ed => ed.id === lastStep.edge);
   if (e) {
-    const nv = map.nodes.find(n => n.id === (lastStep.dir > 0 ? e.v : e.u))!;
-    return [nv.x, nv.y];
+    const targetId = lastStep.dir > 0 ? (e.v ?? (e as any).to) : (e.u ?? (e as any).from);
+    const nv = map.nodes.find(n => n.id === targetId);
+    if (nv) return [nv.x, nv.y];
   }
   return null;
 }
