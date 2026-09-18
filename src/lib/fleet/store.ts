@@ -20,6 +20,8 @@ interface FleetStore {
   setSelection: (robot: string | null, jec: string | null) => void;
   setFutures: (on: boolean) => void;
   setHorizon: (h: 'now' | 2 | 5 | 10) => void;
+  setSnapshot: (snapshot: Snapshot) => void;
+  setMetrics: (metrics: LiveMetrics) => void;
   pushEvents: (evts: StreamEvent[]) => void;
 }
 
@@ -88,6 +90,8 @@ export const useFleet = create<FleetStore>((set, get) => ({
     set({ selectedRobot: robot, selectedJec: jec }),
   setFutures: (on) => set({ futuresMode: on }),
   setHorizon: (h) => set({ horizon: h }),
+  setSnapshot: (snapshot) => set({ snapshot }),
+  setMetrics: (metrics) => set({ metrics }),
   pushEvents: (evts) =>
     set((st) => ({ events: [...evts, ...st.events].slice(0, 250) })),
 }));
