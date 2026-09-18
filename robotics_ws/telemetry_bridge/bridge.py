@@ -21,6 +21,7 @@ Socket.io events (5 Hz snapshot / 1 Hz metrics / on-event telemetry):
 """
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import math
@@ -420,7 +421,7 @@ def build_app(agent: BridgeAgent, wmap, cfg) -> web.Application:
     return app
 
 
-async def main_async():
+async def main_async(args=None):
     cfg = load_fleet_config()
     wmap = load_map()
     runtime = AsyncioRuntime(t0=0.0, scale=1.0)
@@ -433,6 +434,56 @@ async def main_async():
     agent = BridgeAgent(runtime, plane, wmap, cfg)
     agent.set_loop(asyncio.get_event_loop())
     agent.start()
+
+    embedded_agents = []
+    is_lightweight = (args and getattr(args, "lightweight", False)) or os.environ.get("FLEET_LIGHTWEIGHT") == "1"
+    if is_lightweight:
+        from robotics_ws.robot_agent.agent import RobotAgent
+        from robotics_ws.junction_edge_cell.jec import JunctionEdgeCellAgent
+        from robotics_ws.task_allocator.allocator import TaskAllocatorAgent
+        from robotics_ws.task_allocator.scenario import Scenario
+
+        scenario_path = project_path("scenarios", "baseline.json")
+        scenario = Scenario.load(scenario_path, seed=7) if os.path.exists(scenario_path) else None
+
+        spawn = {s["rid"]: s["node"] for s in wmap.spawn if "rid" in s and "node" in s}
+        # Spawn robots
+        for i in range(cfg["fleet"]["robot_count"]):
+            rid = f"R{i + 1:02d}"
+            rng = random.Random(7000 + i)
+            rplane = MessagePlane(backend, rid,
+                                  range_m=cfg["fleet"]["radio_range_robot"],
+                                  profile=ImpairProfile(**cfg.get("impairment", {})),
+                                  rng=rng, scheduler=runtime.call_later)
+            robot = RobotAgent(rid, runtime, rplane, wmap=wmap, cfg=cfg,
+                               seed=7000 + i, mode=cfg["fleet"].get("mode", "FULL_DISTRIBUTED_PREDICTIVE"),
+                               start_node=spawn.get(rid, "J01"))
+            robot.start()
+            embedded_agents.append(robot)
+
+        # Spawn JECs
+        for j, (jid, spec) in enumerate(wmap.jecs.items()):
+            rng = random.Random(8000 + j)
+            jplane = MessagePlane(backend, jid,
+                                  range_m=cfg["fleet"]["radio_range_jec"],
+                                  profile=ImpairProfile(**cfg.get("impairment", {})),
+                                  rng=rng, scheduler=runtime.call_later)
+            jec = JunctionEdgeCellAgent(jid, runtime, jplane, wmap=wmap, cfg=cfg, seed=8000 + j)
+            jec.start()
+            embedded_agents.append(jec)
+
+        # Spawn Allocator
+        if scenario:
+            arng = random.Random(9000)
+            aplane = MessagePlane(backend, "ALLOC", range_m=float("inf"), infra=True,
+                                  profile=ImpairProfile(**cfg.get("impairment", {})),
+                                  rng=arng, scheduler=runtime.call_later)
+            alloc = TaskAllocatorAgent("ALLOC", runtime, aplane, wmap=wmap, cfg=cfg, seed=7, scenario=scenario)
+            alloc.start()
+            embedded_agents.append(alloc)
+
+        print(f"[bridge:lightweight] Running {len(embedded_agents)} fleet agents + bridge in single process (super light!)", flush=True)
+
     app = build_app(agent, wmap, cfg)
     runner = web.AppRunner(app)
     await runner.setup()
@@ -443,11 +494,16 @@ async def main_async():
 
 
 def main():
+    ap = argparse.ArgumentParser(description="Fleet Telemetry Bridge")
+    ap.add_argument("--lightweight", "--inproc", "-l", action="store_true",
+                    help="Run all robots, JECs, and allocator embedded inside this single process")
+    args = ap.parse_args()
     try:
-        asyncio.run(main_async())
+        asyncio.run(main_async(args))
     except KeyboardInterrupt:
         pass
 
 
 if __name__ == "__main__":
     main()
+
