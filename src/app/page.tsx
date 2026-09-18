@@ -18,7 +18,7 @@ type View = 'landing' | 'dashboard';
 type Panel = 'inspector' | 'explainer' | 'events' | 'failure' | 'benchmark';
 
 export default function Home() {
-  const [view, setView] = useState<View>('landing');
+  const [view, setView] = useState<View>('dashboard');
   const [panel, setPanel] = useState<Panel>('inspector');
 
   const connect = useFleet((s) => s.connect);
@@ -34,11 +34,9 @@ export default function Home() {
   const setSelection = useFleet((s) => s.setSelection);
 
   useEffect(() => {
-    if (view === 'dashboard') {
-      const dispose = connect();
-      return dispose;
-    }
-  }, [view, connect]);
+    const dispose = connect();
+    return dispose;
+  }, [connect]);
 
   const handleSelect = (robot: string | null, jec: string | null) => {
     setSelection(robot, jec);
@@ -54,9 +52,25 @@ export default function Home() {
       {/* top bar */}
       <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30 shadow-2xs">
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 h-14 flex items-center justify-between gap-4">
-          <button onClick={() => setView('landing')} className="group flex items-center gap-2 cursor-pointer transition-opacity hover:opacity-90">
-            <FleetLogo size="sm" showSubtitle={false} />
-          </button>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setView('dashboard')} className="group flex items-center gap-2 cursor-pointer transition-opacity hover:opacity-90">
+              <FleetLogo size="sm" showSubtitle={false} />
+            </button>
+            <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
+              <button
+                onClick={() => setView('dashboard')}
+                className="px-2.5 py-1 text-xs font-semibold rounded-md transition-all bg-white shadow-2xs text-slate-900"
+              >
+                Live Control Grid
+              </button>
+              <button
+                onClick={() => setView('landing')}
+                className="px-2.5 py-1 text-xs font-medium rounded-md transition-all text-slate-600 hover:text-slate-900 hover:bg-white/60"
+              >
+                Architecture Overview
+              </button>
+            </div>
+          </div>
 
           <div className="flex items-center gap-3">
             {/* Connection Status */}

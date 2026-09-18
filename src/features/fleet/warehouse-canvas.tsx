@@ -188,6 +188,15 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
     }
   }, [activeSnapshot, select]);
 
+  if (!map) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#F5F2EA] text-slate-500 gap-3 min-h-[440px]">
+        <div className="w-8 h-8 rounded-full border-2 border-orange-500/20 border-t-orange-600 animate-spin" />
+        <p className="font-mono text-xs text-slate-600">Initializing warehouse grid topology...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-full">
       <canvas

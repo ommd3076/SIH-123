@@ -136,7 +136,24 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
       {/* Landing Navbar */}
       <header className="border-b border-slate-200/80 bg-white/70 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <FleetLogo size="md" />
+          <div className="flex items-center gap-4">
+            <button onClick={onLaunch} className="group flex items-center gap-2 cursor-pointer transition-opacity hover:opacity-90">
+              <FleetLogo size="md" />
+            </button>
+            <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
+              <button
+                onClick={onLaunch}
+                className="px-2.5 py-1 text-xs font-medium rounded-md transition-all text-slate-600 hover:text-slate-900 hover:bg-white/60"
+              >
+                Live Control Grid
+              </button>
+              <button
+                className="px-2.5 py-1 text-xs font-semibold rounded-md transition-all bg-white shadow-2xs text-slate-900"
+              >
+                Architecture Overview
+              </button>
+            </div>
+          </div>
           <button
             onClick={onLaunch}
             className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 shadow-sm shadow-orange-500/20 transition-all hover:scale-102 active:scale-98"

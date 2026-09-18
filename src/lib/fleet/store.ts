@@ -43,39 +43,43 @@ export const useFleet = create<FleetStore>((set, get) => ({
       return () => undefined;
     }
     const start = async () => {
-      const { io } = await import('socket.io-client');
-      socket = io(`/?XTransformPort=${BRIDGE_PORT}`, {
-        // polling first: connects even on origins without websocket proxying,
-        // then engine.io upgrades to websocket when the path supports it.
-        transports: ['polling', 'websocket'],
-        reconnection: true,
-        reconnectionAttempts: 12,
-        reconnectionDelay: 1500,
-        timeout: 8000,
-      });
-      socket.on('connect', () => set({ connected: true }));
-      socket.on('disconnect', () => set({ connected: false }));
-      socket.on('snapshot', (snap: Snapshot) => {
-        set({ snapshot: snap });
-        const { selectedRobot, selectedJec } = get();
-        if (selectedRobot && !snap.robots.some((r) => r.robot === selectedRobot)) {
-          set({ selectedRobot: null });
-        }
-        if (selectedJec && !snap.jecs.some((j) => j.jec === selectedJec)) {
-          set({ selectedJec: null });
-        }
-      });
-      socket.on('metrics', (m: LiveMetrics) => set({ metrics: m }));
-      socket.on('event', (evts: StreamEvent[]) => {
-        if (Array.isArray(evts) && evts.length) {
-          set((st) => ({ events: [...evts, ...st.events].slice(0, 250) }));
-        }
-      });
+      try {
+        const { io } = await import('socket.io-client');
+        socket = io({
+          path: '/socket.io',
+          transports: ['polling', 'websocket'],
+          reconnection: true,
+          reconnectionAttempts: 20,
+          reconnectionDelay: 1000,
+          timeout: 10000,
+        });
+        socket.on('connect', () => set({ connected: true }));
+        socket.on('disconnect', () => set({ connected: false }));
+        socket.on('connect_error', () => set({ connected: false }));
+        socket.on('snapshot', (snap: Snapshot) => {
+          set({ snapshot: snap });
+          const { selectedRobot, selectedJec } = get();
+          if (selectedRobot && !snap.robots.some((r) => r.robot === selectedRobot)) {
+            set({ selectedRobot: null });
+          }
+          if (selectedJec && !snap.jecs.some((j) => j.jec === selectedJec)) {
+            set({ selectedJec: null });
+          }
+        });
+        socket.on('metrics', (m: LiveMetrics) => set({ metrics: m }));
+        socket.on('event', (evts: StreamEvent[]) => {
+          if (Array.isArray(evts) && evts.length) {
+            set((st) => ({ events: [...evts, ...st.events].slice(0, 250) }));
+          }
+        });
+      } catch (e) {
+        console.warn('Socket.IO initialization error:', e);
+      }
     };
-    start().catch((e) => console.error('socket connect failed', e));
+    start();
 
-    // fetch the static map once
-    fetch(apiUrl('/api/map'))
+    // fetch the static map
+    fetch('/api/map')
       .then((r) => r.json())
       .then((map: WarehouseMap) => set({ map }))
       .catch((e) => console.error('map fetch failed', e));
@@ -97,3 +101,10 @@ export const useFleet = create<FleetStore>((set, get) => ({
 }));
 
 export type { ConflictCell, DecisionEvent };
+
+if (typeof window !== 'undefined') {
+  fetch('/api/map')
+    .then((r) => r.json())
+    .then((map: WarehouseMap) => useFleet.setState({ map }))
+    .catch((e) => console.warn('map prefetch failed', e));
+}
