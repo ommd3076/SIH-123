@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFleet } from '@/lib/fleet/store';
-import { useSimulation } from '@/hooks/use-simulation';
 import type { RobotView, Snapshot, WarehouseMap, JecView } from '@/lib/fleet/types';
 
 /** Palette — warm research interface + semantic state colors. */
@@ -68,19 +67,7 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
   const connect = useFleet((s) => s.connect);
   const select = onSelect ?? setSelection;
 
-  const setSnapshot = useFleet((s) => s.setSnapshot);
-  const setMetrics = useFleet((s) => s.setMetrics);
-
-  // Use simulation when not connected to backend
-  const { snapshot: simSnapshot } = useSimulation({ 
-    map, 
-    enabled: !connected && map !== null,
-    speed: 1.5,
-    robotCount: 14 
-  });
-
-  // Use real snapshot if connected, otherwise simulation
-  const activeSnapshot = connected ? snapshot : simSnapshot;
+  const activeSnapshot = snapshot;
 
   const interp = useRef<Interp | null>(null);
   const trails = useRef<Record<string, [number, number][]>>({});
@@ -99,31 +86,8 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
         }
       }
       interp.current = { snapshot: activeSnapshot, t0: performance.now() };
-
-      if (!connected && simSnapshot) {
-        setSnapshot(simSnapshot);
-        const activeTasks = simSnapshot.robots.filter(r => r.state === 'TO_PICKUP' || r.state === 'TO_DROP').length;
-        setMetrics({
-          t: simSnapshot.t,
-          robots_online: simSnapshot.robots.length,
-          jecs_online: simSnapshot.jecs.length,
-          tasks_done: Math.floor(simSnapshot.t * 0.4),
-          tasks_pending: 2,
-          tasks_active: activeTasks,
-          mean_wait_s: 0.8,
-          p95_wait_s: 1.2,
-          distance_m: Math.floor(simSnapshot.t * 1.5),
-          energy_j: Math.floor(simSnapshot.t * 22),
-          vetoes: Math.floor(simSnapshot.t * 0.1),
-          replans: 0,
-          conflicts_active: 0,
-          messages_per_s: 14.5,
-          bytes_per_s: 2400,
-          collisions: 0,
-        });
-      }
     }
-  }, [activeSnapshot, connected, simSnapshot, setSnapshot, setMetrics]);
+  }, [activeSnapshot]);
 
   useEffect(() => {
     // Auto-connect if not connected
@@ -206,9 +170,10 @@ export function WarehouseCanvas({ onSelect }: { onSelect?: (robot: string | null
         aria-label="Live warehouse fleet view"
         style={{ background: C.paper }}
       />
-      {!connected && map && (
-        <div className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-100 text-amber-900 border border-amber-300 shadow-sm">
-          Simulation Mode — Demo
+      {!connected && (
+        <div className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-md text-xs font-medium bg-red-100 text-red-900 border border-red-300 shadow-sm flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          Backend Disconnected
         </div>
       )}
     </div>

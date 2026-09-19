@@ -1,0 +1,8 @@
+{
+  "scope": "industry-plan",
+  "leaf": "leaf-1.3",
+  "globs": [
+    ".unlazy/industry-plan/team-review.md"
+  ],
+  "pid": 24940
+}

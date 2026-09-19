@@ -1,0 +1,16 @@
+# Gates: fleet product analysis and three-person prototype plan
+
+Scope: Deliver a repository-grounded problem verdict, feature scope, robot and synchronization design, UI direction, and sequenced three-person implementation plan. This task produces planning artifacts, not a completed robotics implementation.
+
+- [x] G1: The recommendation distinguishes inspected implementation, historical claims, proposals, and unresolved constraints.
+  EVIDENCE: Manual review of PRODUCT_DIRECTION sections 2, 4 and 7 against source files, live browser at localhost:3012, and backend snapshot at time 57148.16. Records ten robots/nine cells, R06 reported zero battery and nonzero speed, empty schemas, historical nonzero proximity counts, and limits of this review. No robotics suite or clean-launch completion claimed.
+- [x] G2: The plan defines a narrow operational problem and justified keep, add, defer, and remove decisions against current primary-source prior art.
+  EVIDENCE: Official SIH26123 detail modal inspected on sih.gov.in/sih2026PS; three robots, local coordination, battery/position UI and completion-time criterion matched to plan. PRODUCT_DIRECTION sections 1-6 contain authored problem statement, feature decisions, and direct Open-RMF/VDA references; implementation protocol cites the original Ricart-Agrawala paper and its assumptions.
+- [x] G3: The plan defines persistent robot identity, geometry, energy, tasks, charging, failure, and backend-owned lifecycle behavior.
+  EVIDENCE: IMPLEMENTATION_PLAN section 4 reviewed for profile/observation separation, SOC conversion, energy units, depleted stop, charger occupancy, eligibility and cargo custody. Sections 5 and 7 specify uncertain occupied resources and full-stage physical geometry.
+- [x] G4: The plan specifies authoritative telemetry, command acknowledgement, persistence, reconnect, stale-state behavior, and integration acceptance criteria.
+  EVIDENCE: IMPLEMENTATION_PLAN sections 6, 8 and 9 reviewed for source authority, full snapshots then deltas, epochs, clock separation, source-rate-dependent freshness, command idempotency/unknown outcomes, durable reconstruction, two-browser checks and controlled time benchmarks.
+- [x] G5: The UI direction specifies navigation, spatial layout, robot presence, workflows, and failure states using inspected UI evidence.
+  EVIDENCE: UI_DIRECTION sections 2-9 cover layout, roster, inspector, tasks, incidents, charging, offline state and responsive acceptance. Live current UI visually inspected; interactive concept rendered in browser and R03 selection updated roster, map and inspector. Fragment script syntax checked. Preview is explicitly example data, not an implemented live UI.
+- [x] G6: Three named roles have file ownership, dependencies, staged deliverables, testable completion criteria, and a realistic prototype-to-product path.
+  EVIDENCE: IMPLEMENTATION_PLAN sections 1-3 and 7-9 reviewed for A/B/C ownership, shared-file boundaries, daily integration gates, 48-hour cuts, nine pre-PPT acceptance checks, full-stage estimates, edge evaluation and release gates. Team skills and full-stage dates remain labeled unknown. Local Markdown links verified; all six gates are manual planning-quality judgments, not software-test results.

@@ -10,7 +10,7 @@ import { EventFeed, DecisionExplainer } from '@/features/fleet/feeds';
 import { FailureLab } from '@/features/failure-lab';
 import { BenchmarkLab } from '@/features/benchmark-lab';
 import { FleetLogo } from '@/components/fleet-logo';
-import type { LiveMetrics } from '@/lib/fleet/types';
+import type { LiveMetrics, Snapshot } from '@/lib/fleet/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -205,25 +205,68 @@ function MetricsStrip({
   connected,
 }: {
   metrics: LiveMetrics | null;
-  snapshot: any;
+  snapshot: Snapshot | null;
   connected: boolean;
 }) {
   const items = useMemo(() => {
-    const robCount = snapshot?.robots?.length ?? 10;
-    const jecCount = snapshot?.jecs?.length ?? 6;
-    const activeTasks = snapshot?.robots?.filter((r: any) => r.state === 'TO_PICKUP' || r.state === 'TO_DROP').length ?? 0;
-    const doneTasks = metrics?.tasks_done ?? Math.max(0, Math.floor((snapshot?.t ?? 0) * 0.4));
+    const unavailable = '—';
+    const robotCount = connected ? snapshot?.robots.length : undefined;
+    const jecCount = connected ? snapshot?.jecs.length : undefined;
+    const activeTasks = connected
+      ? snapshot?.robots.filter((robot) => robot.state === 'TO_PICKUP' || robot.state === 'TO_DROP').length
+      : undefined;
+    const activeConflicts = connected ? snapshot?.conflicts.length : undefined;
+    const p95Wait = connected ? metrics?.p95_wait_s : undefined;
+    const collisionCount = connected ? metrics?.collisions : undefined;
 
     return [
-      { label: 'Robots Active', value: `${metrics?.robots_online ?? robCount}/10`, tone: 'text-slate-900' },
-      { label: 'Edge Cells', value: `${metrics?.jecs_online ?? jecCount}/6`, tone: 'text-slate-900' },
-      { label: 'Tasks Done', value: String(doneTasks), tone: 'text-emerald-600' },
-      { label: 'Active Work', value: String(metrics?.tasks_active ?? activeTasks), tone: 'text-orange-600' },
-      { label: 'p95 Latency', value: `${metrics?.p95_wait_s ?? 1.1}s`, tone: (metrics?.p95_wait_s ?? 0) > 25 ? 'text-amber-600' : 'text-slate-800' },
-      { label: 'Safety Vetoes', value: String(metrics?.vetoes ?? Math.floor((snapshot?.t ?? 0) * 0.1)), tone: 'text-amber-600' },
-      { label: 'Conflict Cells', value: String(metrics?.conflicts_active ?? 0), tone: (metrics?.conflicts_active ?? 0) > 0 ? 'text-orange-600' : 'text-slate-700' },
-      { label: 'Mesh Rate', value: connected ? `${metrics?.messages_per_s ?? 12.5}/s` : 'active', tone: 'text-slate-700' },
-      { label: 'Collisions', value: String(metrics?.collisions ?? 0), tone: (metrics?.collisions ?? 0) > 0 ? 'text-red-600' : 'text-emerald-600' },
+      {
+        label: 'Robots Active',
+        value: robotCount === undefined ? unavailable : `${metrics?.robots_online ?? robotCount}/${robotCount}`,
+        tone: 'text-slate-900',
+      },
+      {
+        label: 'Edge Cells',
+        value: jecCount === undefined ? unavailable : `${metrics?.jecs_online ?? jecCount}/${jecCount}`,
+        tone: 'text-slate-900',
+      },
+      {
+        label: 'Tasks Done',
+        value: connected && metrics ? String(metrics.tasks_done) : unavailable,
+        tone: 'text-emerald-600',
+      },
+      {
+        label: 'Active Work',
+        value: activeTasks === undefined ? unavailable : String(metrics?.tasks_active ?? activeTasks),
+        tone: 'text-orange-600',
+      },
+      {
+        label: 'p95 Wait',
+        value: p95Wait === undefined ? unavailable : `${p95Wait}s`,
+        tone: p95Wait !== undefined && p95Wait > 25 ? 'text-amber-600' : 'text-slate-800',
+      },
+      {
+        label: 'Safety Vetoes',
+        value: connected && metrics ? String(metrics.vetoes) : unavailable,
+        tone: 'text-amber-600',
+      },
+      {
+        label: 'Conflict Cells',
+        value: activeConflicts === undefined
+          ? unavailable
+          : String(metrics?.conflicts_active ?? activeConflicts),
+        tone: (metrics?.conflicts_active ?? activeConflicts ?? 0) > 0 ? 'text-orange-600' : 'text-slate-700',
+      },
+      {
+        label: 'Mesh Rate',
+        value: connected && metrics ? `${metrics.messages_per_s}/s` : unavailable,
+        tone: 'text-slate-700',
+      },
+      {
+        label: 'Collisions',
+        value: collisionCount === undefined ? unavailable : String(collisionCount),
+        tone: collisionCount !== undefined && collisionCount > 0 ? 'text-red-600' : 'text-emerald-600',
+      },
     ];
   }, [metrics, snapshot, connected]);
 
@@ -240,4 +283,3 @@ function MetricsStrip({
     </div>
   );
 }
-
